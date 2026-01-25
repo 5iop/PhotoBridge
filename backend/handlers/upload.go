@@ -46,11 +46,13 @@ func UploadPhotos(c *gin.Context) {
 
 	for _, file := range files {
 		filename := filepath.Base(file.Filename)
-		ext := strings.ToLower(filepath.Ext(filename))
-		baseName := strings.TrimSuffix(filename, ext)
+		origExt := filepath.Ext(filename)
+		ext := strings.ToLower(origExt)
+		baseName := strings.TrimSuffix(filename, origExt)
 
-		// Save file
-		dst := filepath.Join(uploadDir, filename)
+		// Save file with lowercase extension for consistency
+		newFilename := baseName + ext
+		dst := filepath.Join(uploadDir, newFilename)
 		if err := c.SaveUploadedFile(file, dst); err != nil {
 			continue
 		}
@@ -132,11 +134,13 @@ func UploadViaAPI(c *gin.Context) {
 
 	for _, file := range files {
 		filename := filepath.Base(file.Filename)
-		ext := strings.ToLower(filepath.Ext(filename))
-		baseName := strings.TrimSuffix(filename, ext)
+		origExt := filepath.Ext(filename)
+		ext := strings.ToLower(origExt)
+		baseName := strings.TrimSuffix(filename, origExt)
 
-		// Save file
-		dst := filepath.Join(uploadDir, filename)
+		// Save file with lowercase extension for consistency
+		newFilename := baseName + ext
+		dst := filepath.Join(uploadDir, newFilename)
 		if err := c.SaveUploadedFile(file, dst); err != nil {
 			continue
 		}
