@@ -1,0 +1,46 @@
+version: '3.8'
+
+services:
+  photobridge:
+    image: ghcr.io/5iop/photobridge:latest
+    container_name: photobridge
+    restart: unless-stopped
+    environment:
+      - ADMIN_USERNAME=${ADMIN_USERNAME:-admin}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin123}
+      - API_KEY=${API_KEY:-photobridge-api-key}
+      - JWT_SECRET=${JWT_SECRET:-photobridge-jwt-secret}
+      - PORT=80
+      - GIN_MODE=release
+    volumes:
+      - photobridge_data:/app/data
+      - photobridge_uploads:/app/uploads
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80/api/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.photobridge.rule=Host(`${PHOTOBRIDGE_DOMAIN:-photobridge.localhost}`)"
+      - "traefik.http.routers.photobridge.entrypoints=websecure"
+      - "traefik.http.routers.photobridge.tls=true"
+      - "traefik.http.routers.photobridge.tls.certresolver=letsencrypt"
+      - "traefik.http.services.photobridge.loadbalancer.server.port=80"
+      # HTTP redirect to HTTPS
+      - "traefik.http.routers.photobridge-http.rule=Host(`${PHOTOBRIDGE_DOMAIN:-photobridge.localhost}`)"
+      - "traefik.http.routers.photobridge-http.entrypoints=web"
+      - "traefik.http.routers.photobridge-http.middlewares=redirect-to-https"
+      - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
+      - "traefik.http.middlewares.redirect-to-https.redirectscheme.permanent=true"
+    networks:
+      - traefik
+
+volumes:
+  photobridge_data:
+  photobridge_uploads:
+
+networks:
+  traefik:
+    external: true
