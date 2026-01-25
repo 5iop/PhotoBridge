@@ -1,7 +1,10 @@
 package handlers
 
 import (
+	"crypto/rand"
+	"encoding/base64"
 	"net/http"
+	"strings"
 	"time"
 
 	"photobridge/config"
@@ -11,8 +14,16 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/google/uuid"
 )
+
+// generateShortToken generates a short URL-safe token (8 characters)
+func generateShortToken() string {
+	b := make([]byte, 6)
+	rand.Read(b)
+	token := base64.URLEncoding.EncodeToString(b)
+	token = strings.TrimRight(token, "=")
+	return token
+}
 
 type LoginRequest struct {
 	Username string `json:"username" binding:"required"`
@@ -191,7 +202,7 @@ func CreateShareLink(c *gin.Context) {
 
 	link := models.ShareLink{
 		ProjectID: project.ID,
-		Token:     uuid.New().String(),
+		Token:     generateShortToken(),
 		Alias:     req.Alias,
 		AllowRaw:  req.AllowRaw,
 	}
