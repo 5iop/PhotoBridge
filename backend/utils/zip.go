@@ -11,6 +11,7 @@ import (
 // MaxFilesPerZip limits the number of files in a single zip download to prevent abuse
 const MaxFilesPerZip = 1000
 
+
 // CreateZip creates a zip archive from a list of files using streaming.
 // This implementation is memory-efficient as it uses io.Copy which streams
 // file contents through a small buffer (typically 32KB) rather than loading
@@ -56,7 +57,10 @@ func addFileToZip(zipWriter *zip.Writer, filePath string, basePath string) error
 		relPath = filepath.Base(filePath)
 	}
 	header.Name = relPath
-	header.Method = zip.Deflate
+
+	// Always use Store (no compression) - photos are already compressed
+	// This reduces CPU and memory usage significantly on limited servers
+	header.Method = zip.Store
 
 	writer, err := zipWriter.CreateHeader(header)
 	if err != nil {

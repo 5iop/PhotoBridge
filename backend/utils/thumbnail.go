@@ -11,9 +11,10 @@ import (
 )
 
 const (
-	ThumbSmallWidth = 400  // 列表缩略图宽度
-	ThumbLargeWidth = 1600 // 预览缩略图宽度
-	JpegQuality     = 85   // JPEG压缩质量
+	ThumbSmallWidth   = 400  // 列表缩略图宽度
+	ThumbLargeWidth   = 1600 // 预览缩略图宽度
+	JpegQualitySmall  = 75   // 小缩略图JPEG质量 (lower quality acceptable at small size)
+	JpegQualityLarge  = 85   // 大缩略图JPEG质量
 )
 
 // ThumbnailResult 缩略图生成结果
@@ -51,16 +52,19 @@ func GenerateThumbnails(imagePath string) (*ThumbnailResult, error) {
 	}
 
 	// 生成小缩略图 (用于列表)
-	smallImg := imaging.Resize(img, ThumbSmallWidth, 0, imaging.Lanczos)
+	// Use Box filter for small thumbnails - 10-50x faster, quality difference
+	// is not noticeable at small sizes
+	smallImg := imaging.Resize(img, ThumbSmallWidth, 0, imaging.Box)
 	smallBounds := smallImg.Bounds()
 	result.SmallWidth = smallBounds.Dx()
 	result.SmallHeight = smallBounds.Dy()
 
 	var smallBuf bytes.Buffer
-	if err := jpeg.Encode(&smallBuf, smallImg, &jpeg.Options{Quality: JpegQuality}); err != nil {
+	if err := jpeg.Encode(&smallBuf, smallImg, &jpeg.Options{Quality: JpegQualitySmall}); err != nil {
 		return nil, err
 	}
 	result.Small = smallBuf.Bytes()
+	smallImg = nil // Release memory before creating large thumbnail
 
 	// 生成大缩略图 (用于预览)
 	// 如果原图小于预览尺寸，则使用原图尺寸
@@ -69,9 +73,10 @@ func GenerateThumbnails(imagePath string) (*ThumbnailResult, error) {
 		largeWidth = originalWidth
 	}
 
-	largeImg := imaging.Resize(img, largeWidth, 0, imaging.Lanczos)
+	// Use CatmullRom for large thumbnails - faster than Lanczos, good quality
+	largeImg := imaging.Resize(img, largeWidth, 0, imaging.CatmullRom)
 	var largeBuf bytes.Buffer
-	if err := jpeg.Encode(&largeBuf, largeImg, &jpeg.Options{Quality: JpegQuality}); err != nil {
+	if err := jpeg.Encode(&largeBuf, largeImg, &jpeg.Options{Quality: JpegQualityLarge}); err != nil {
 		return nil, err
 	}
 	result.Large = largeBuf.Bytes()
