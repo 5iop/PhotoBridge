@@ -45,6 +45,7 @@ export const deleteProject = (id) => api.delete(`/admin/projects/${id}`)
 // Photos
 export const getProjectPhotos = (projectId) => api.get(`/admin/projects/${projectId}/photos`)
 export const deletePhoto = (id) => api.delete(`/admin/photos/${id}`)
+export const checkHashes = (projectId, hashes) => api.post(`/admin/projects/${projectId}/photos/check-hashes`, { hashes })
 
 // Share links
 export const getShareLinks = (projectId) => api.get(`/admin/projects/${projectId}/links`)

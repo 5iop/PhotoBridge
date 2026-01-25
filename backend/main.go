@@ -62,6 +62,7 @@ func main() {
 			// Photos
 			admin.POST("/projects/:id/photos", handlers.UploadPhotos)
 			admin.GET("/projects/:id/photos", handlers.GetProjectPhotos)
+			admin.POST("/projects/:id/photos/check-hashes", handlers.CheckHashes)
 			admin.DELETE("/photos/:id", handlers.DeletePhoto)
 			admin.GET("/photos/:id/exif", handlers.GetAdminPhotoExif)
 			admin.GET("/photos/:id/files", handlers.GetPhotoFiles)

@@ -2,7 +2,7 @@
 import { ref, onMounted, computed, reactive, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import * as api from '../../api'
-import { getUploadUrl, fetchAdminThumbSmall, fetchAdminThumbLarge, clearThumbCache } from '../../api'
+import { getUploadUrl, fetchAdminThumbSmall, fetchAdminThumbLarge, clearThumbCache, checkHashes } from '../../api'
 
 // FilePond imports
 import vueFilePond from 'vue-filepond'
@@ -26,6 +26,10 @@ const selectedPhotos = ref(new Set())
 const pond = ref(null)
 const uploadedCount = ref(0)
 const failedFiles = ref([])
+const skippedFiles = ref([])  // Files skipped due to duplicate hash
+
+// File hash cache: filename -> hash
+const fileHashCache = new Map()
 
 // Link management
 const showLinkModal = ref(false)
@@ -172,43 +176,69 @@ function handlePreviewThumbError(event) {
 
 // FilePond server configuration
 const filePondServer = computed(() => ({
-  process: (fieldName, file, metadata, load, error, progress, abort) => {
-    const formData = new FormData()
-    formData.append('files', file)
+  process: async (fieldName, file, metadata, load, error, progress, abort) => {
+    let aborted = false
+    const abortController = { abort: () => { aborted = true } }
 
-    const token = localStorage.getItem('token')
-    const xhr = new XMLHttpRequest()
+    try {
+      // Calculate file hash
+      progress(true, 0, 100)  // Show indeterminate progress during hash calculation
+      const hash = await calculateFileHash(file)
 
-    xhr.open('POST', `${getUploadUrl()}/api/admin/projects/${projectId.value}/photos`)
-    xhr.setRequestHeader('Authorization', `Bearer ${token}`)
+      if (aborted) return abortController
 
-    xhr.upload.onprogress = (e) => {
-      progress(e.lengthComputable, e.loaded, e.total)
-    }
+      // Check if this hash already exists on server
+      const response = await checkHashes(projectId.value, [hash])
+      if (aborted) return abortController
 
-    xhr.onload = () => {
-      if (xhr.status >= 200 && xhr.status < 300) {
-        uploadedCount.value++
-        load(xhr.responseText)
-      } else {
-        failedFiles.value.push(file.name)
-        error('Upload failed')
+      if (response.data.existing && response.data.existing.includes(hash)) {
+        // File already exists, skip upload
+        skippedFiles.value.push(file.name)
+        load('skipped')  // Mark as completed but skipped
+        return abortController
       }
-    }
 
-    xhr.onerror = () => {
-      failedFiles.value.push(file.name)
-      error('Network error')
-    }
+      // Proceed with upload
+      const formData = new FormData()
+      formData.append('files', file)
 
-    xhr.send(formData)
+      const token = localStorage.getItem('token')
+      const xhr = new XMLHttpRequest()
 
-    return {
-      abort: () => {
+      xhr.open('POST', `${getUploadUrl()}/api/admin/projects/${projectId.value}/photos`)
+      xhr.setRequestHeader('Authorization', `Bearer ${token}`)
+
+      xhr.upload.onprogress = (e) => {
+        progress(e.lengthComputable, e.loaded, e.total)
+      }
+
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          uploadedCount.value++
+          load(xhr.responseText)
+        } else {
+          failedFiles.value.push(file.name)
+          error('Upload failed')
+        }
+      }
+
+      xhr.onerror = () => {
+        failedFiles.value.push(file.name)
+        error('Network error')
+      }
+
+      abortController.abort = () => {
         xhr.abort()
         abort()
       }
+
+      xhr.send(formData)
+    } catch (err) {
+      failedFiles.value.push(file.name)
+      error('Hash check failed')
     }
+
+    return abortController
   }
 }))
 
@@ -228,22 +258,41 @@ const acceptedFileTypes = [
   'image/x-sigma-x3f'
 ]
 
+// Calculate SHA-256 hash of a file
+async function calculateFileHash(file) {
+  const buffer = await file.arrayBuffer()
+  const hashBuffer = await crypto.subtle.digest('SHA-256', buffer)
+  const hashArray = Array.from(new Uint8Array(hashBuffer))
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
+}
+
 function handleFilePondInit() {
   // Reset counters when FilePond initializes
   uploadedCount.value = 0
   failedFiles.value = []
+  skippedFiles.value = []
+  fileHashCache.clear()
 }
 
 function handleProcessFiles() {
   // Called when all files have been processed
+  let message = `上传完成: ${uploadedCount.value} 个文件成功`
+  if (skippedFiles.value.length > 0) {
+    message += `, ${skippedFiles.value.length} 个文件已存在(跳过)`
+  }
   if (failedFiles.value.length > 0) {
-    alert(`上传完成，但 ${failedFiles.value.length} 个文件失败:\n${failedFiles.value.join('\n')}`)
+    message += `, ${failedFiles.value.length} 个文件失败`
+  }
+  if (skippedFiles.value.length > 0 || failedFiles.value.length > 0) {
+    alert(message)
   }
   // Refresh photo list
   fetchData()
   // Reset counters
   uploadedCount.value = 0
   failedFiles.value = []
+  skippedFiles.value = []
+  fileHashCache.clear()
 }
 
 function toggleSelect(photoId) {

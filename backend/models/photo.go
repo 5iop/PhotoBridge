@@ -13,10 +13,11 @@ type Photo struct {
 	NormalExt     string         `gorm:"size:10" json:"normal_ext"`
 	RawExt        string         `gorm:"size:10" json:"raw_ext"`
 	HasRaw        bool           `gorm:"default:false" json:"has_raw"`
-	ThumbSmall    []byte         `gorm:"type:blob" json:"-"`           // 列表缩略图 ~300px
-	ThumbLarge    []byte         `gorm:"type:blob" json:"-"`           // 预览缩略图 ~1200px
-	ThumbWidth    int            `json:"thumb_width,omitempty"`        // 缩略图宽度
-	ThumbHeight   int            `json:"thumb_height,omitempty"`       // 缩略图高度
+	FileHash      string         `gorm:"size:64;index" json:"file_hash,omitempty"` // SHA-256 hash for deduplication
+	ThumbSmall    []byte         `gorm:"type:blob" json:"-"`                       // 列表缩略图 ~300px
+	ThumbLarge    []byte         `gorm:"type:blob" json:"-"`                       // 预览缩略图 ~1200px
+	ThumbWidth    int            `json:"thumb_width,omitempty"`                    // 缩略图宽度
+	ThumbHeight   int            `json:"thumb_height,omitempty"`                   // 缩略图高度
 	CreatedAt     time.Time      `json:"created_at"`
 	UpdatedAt     time.Time      `json:"updated_at"`
 	DeletedAt     gorm.DeletedAt `gorm:"index" json:"-"`

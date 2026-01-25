@@ -24,6 +24,19 @@ func processUploadedFile(c *gin.Context, file *multipart.FileHeader, project *mo
 	ext := strings.ToLower(origExt)
 	baseName := strings.TrimSuffix(filename, origExt)
 
+	// Calculate file hash for deduplication
+	fileHash, err := utils.CalculateFileHash(file)
+	if err != nil {
+		return nil, fmt.Errorf("failed to calculate file hash: %v", err)
+	}
+
+	// Check if file with same hash already exists in this project
+	var existingByHash models.Photo
+	if err := database.DB.Where("project_id = ? AND file_hash = ?", project.ID, fileHash).First(&existingByHash).Error; err == nil {
+		// File already exists, return existing photo without saving again
+		return &existingByHash, nil
+	}
+
 	// Save file with lowercase extension for consistency
 	newFilename := baseName + ext
 	dst := filepath.Join(uploadDir, newFilename)
@@ -42,6 +55,7 @@ func processUploadedFile(c *gin.Context, file *multipart.FileHeader, project *mo
 			existingPhoto.HasRaw = true
 		} else if models.IsImageExtension(ext) {
 			existingPhoto.NormalExt = ext
+			existingPhoto.FileHash = fileHash
 			// 清除旧缩略图，浏览时会按需重新生成
 			existingPhoto.ThumbSmall = nil
 			existingPhoto.ThumbLarge = nil
@@ -56,6 +70,7 @@ func processUploadedFile(c *gin.Context, file *multipart.FileHeader, project *mo
 	photo := models.Photo{
 		ProjectID: project.ID,
 		BaseName:  baseName,
+		FileHash:  fileHash,
 	}
 	if models.IsRawExtension(ext) {
 		photo.RawExt = ext
@@ -193,4 +208,55 @@ func GetProjectPhotos(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, photos)
+}
+
+// CheckHashes checks which file hashes already exist in a project
+// POST body: { "hashes": ["hash1", "hash2", ...] }
+// Response: { "existing": ["hash1", ...], "new": ["hash2", ...] }
+func CheckHashes(c *gin.Context) {
+	projectID := c.Param("id")
+
+	var project models.Project
+	if err := database.DB.First(&project, projectID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Project not found"})
+		return
+	}
+
+	var req struct {
+		Hashes []string `json:"hashes"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
+		return
+	}
+
+	if len(req.Hashes) == 0 {
+		c.JSON(http.StatusOK, gin.H{"existing": []string{}, "new": []string{}})
+		return
+	}
+
+	// Query existing hashes
+	var existingPhotos []models.Photo
+	database.DB.Where("project_id = ? AND file_hash IN ?", project.ID, req.Hashes).Find(&existingPhotos)
+
+	existingSet := make(map[string]bool)
+	for _, photo := range existingPhotos {
+		if photo.FileHash != "" {
+			existingSet[photo.FileHash] = true
+		}
+	}
+
+	var existing, newHashes []string
+	for _, hash := range req.Hashes {
+		if existingSet[hash] {
+			existing = append(existing, hash)
+		} else {
+			newHashes = append(newHashes, hash)
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"existing": existing,
+		"new":      newHashes,
+	})
 }
