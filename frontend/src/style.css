@@ -1,0 +1,85 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-dark-500 text-gray-100 font-sans antialiased;
+    margin: 0;
+  }
+}
+
+@layer components {
+  .btn {
+    @apply px-4 py-2 rounded-xl font-medium transition-all duration-200 inline-flex items-center justify-center gap-2;
+  }
+
+  .btn-primary {
+    @apply bg-gradient-to-r from-primary-600 to-primary-500 text-white hover:from-primary-500 hover:to-primary-400 shadow-lg shadow-primary-500/25;
+  }
+
+  .btn-secondary {
+    @apply bg-dark-300 text-gray-300 hover:bg-dark-200 border border-dark-100;
+  }
+
+  .btn-danger {
+    @apply bg-red-600 text-white hover:bg-red-500;
+  }
+
+  .card {
+    @apply bg-dark-400 rounded-2xl border border-dark-200 overflow-hidden;
+  }
+
+  .input {
+    @apply w-full px-4 py-3 bg-dark-300 border border-dark-100 rounded-xl text-gray-100 placeholder-gray-500 focus:outline-none focus:border-primary-500 focus:ring-1 focus:ring-primary-500 transition-all;
+  }
+
+  .label {
+    @apply block text-sm font-medium text-gray-400 mb-2;
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #1a1a24;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #3f3f4a;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #5f5f6a;
+}
+
+/* Photo grid animations */
+.photo-enter-active,
+.photo-leave-active {
+  transition: all 0.3s ease;
+}
+
+.photo-enter-from,
+.photo-leave-to {
+  opacity: 0;
+  transform: scale(0.9);
+}
+
+/* Loading spinner */
+.spinner {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}

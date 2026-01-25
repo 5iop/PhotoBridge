@@ -1,0 +1,45 @@
+# Git
+.git
+.gitignore
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build artifacts
+backend/photobridge
+backend/photobridge.exe
+frontend/dist
+frontend/node_modules
+
+# Data and uploads (runtime only)
+data/
+uploads/
+
+# Documentation
+*.md
+!README.md
+
+# CI/CD
+.github/
+
+# Local config
+.env
+.env.local
+*.local
+
+# Logs
+*.log
+
+# Test files
+*_test.go
+**/*.test.js
+
+# Windows scripts
+*.bat
