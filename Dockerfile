@@ -1,7 +1,7 @@
 # ============================================
 # Stage 1: Build Frontend
 # ============================================
-FROM node:20-alpine AS frontend-builder
+FROM node:20-slim AS frontend-builder
 
 WORKDIR /app/frontend
 
@@ -20,10 +20,14 @@ RUN npm run build
 # ============================================
 # Stage 2: Build Backend
 # ============================================
-FROM golang:1.21-alpine AS backend-builder
+FROM golang:1.21 AS backend-builder
 
 # Install build dependencies
-RUN apk add --no-cache gcc musl-dev
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc \
+    libc6-dev \
+    libsqlite3-dev \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app/backend
 
@@ -37,7 +41,7 @@ RUN go mod download
 COPY backend/ ./
 
 # Build binary with optimizations
-RUN CGO_ENABLED=1 GOOS=linux go build \
+RUN CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build \
     -ldflags="-w -s" \
     -o photobridge \
     .
@@ -45,13 +49,19 @@ RUN CGO_ENABLED=1 GOOS=linux go build \
 # ============================================
 # Stage 3: Production Image
 # ============================================
-FROM alpine:3.19
+FROM ubuntu:22.04
 
 # Install runtime dependencies
-RUN apk add --no-cache ca-certificates tzdata
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    tzdata \
+    sqlite3 \
+    vim \
+    wget \
+    && rm -rf /var/lib/apt/lists/*
 
 # Create non-root user
-RUN adduser -D -u 1000 photobridge
+RUN useradd -m -u 1000 photobridge
 
 WORKDIR /app
 
