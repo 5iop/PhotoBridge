@@ -96,7 +96,7 @@ async function updateLink() {
 }
 
 async function deleteLink(link) {
-  if (!confirm(`Delete link "${link.alias || link.token}"?`)) return
+  if (!confirm(`确定要删除链接 "${link.alias || link.token}" 吗？`)) return
   await api.deleteShareLink(link.id)
   await fetchData()
 }
@@ -135,14 +135,14 @@ function openCreateModal() {
             </svg>
           </button>
           <div class="flex-1">
-            <h1 class="text-xl font-bold text-white">Share Links</h1>
-            <p class="text-sm text-gray-400">{{ project?.name || 'Loading...' }}</p>
+            <h1 class="text-xl font-bold text-white">分享链接</h1>
+            <p class="text-sm text-gray-400">{{ project?.name || '加载中...' }}</p>
           </div>
           <button @click="openCreateModal" class="btn btn-primary">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
             </svg>
-            New Link
+            新建链接
           </button>
         </div>
       </div>
@@ -165,10 +165,10 @@ function openCreateModal() {
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
           </svg>
         </div>
-        <h3 class="text-lg font-medium text-white mb-2">No share links yet</h3>
-        <p class="text-gray-400 mb-4">Create a link to share this project with clients</p>
+        <h3 class="text-lg font-medium text-white mb-2">暂无分享链接</h3>
+        <p class="text-gray-400 mb-4">创建链接以便与客户分享此项目</p>
         <button @click="openCreateModal" class="btn btn-primary">
-          Create Link
+          创建链接
         </button>
       </div>
 
@@ -177,23 +177,23 @@ function openCreateModal() {
         <div v-for="link in links" :key="link.id" class="card p-6">
           <div class="flex items-start justify-between gap-4">
             <div class="flex-1 min-w-0">
-              <h3 class="font-semibold text-white">{{ link.alias || 'Untitled Link' }}</h3>
+              <h3 class="font-semibold text-white">{{ link.alias || '未命名链接' }}</h3>
               <p class="text-sm text-gray-400 truncate mt-1">{{ getShareUrl(link) }}</p>
               <div class="flex items-center gap-4 mt-3">
                 <span v-if="link.allow_raw" class="inline-flex items-center gap-1 text-xs text-primary-400">
                   <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
                   </svg>
-                  RAW allowed
+                  允许 RAW
                 </span>
                 <span v-else class="inline-flex items-center gap-1 text-xs text-gray-500">
                   <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                   </svg>
-                  RAW disabled
+                  禁止 RAW
                 </span>
                 <span v-if="link.exclusions?.length" class="text-xs text-gray-500">
-                  {{ link.exclusions.length }} photo(s) hidden
+                  {{ link.exclusions.length }} 张照片已隐藏
                 </span>
               </div>
             </div>
@@ -202,13 +202,13 @@ function openCreateModal() {
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
                 </svg>
-                Copy
+                复制
               </button>
               <button @click="openEditModal(link)" class="btn btn-secondary text-sm">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                 </svg>
-                Edit
+                编辑
               </button>
               <button @click="deleteLink(link)" class="btn btn-secondary text-sm text-red-400 hover:text-red-300">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -225,17 +225,17 @@ function openCreateModal() {
     <div v-if="showCreateModal || showEditModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 overflow-y-auto">
       <div class="card p-6 w-full max-w-2xl my-8" @click.stop>
         <h3 class="text-lg font-semibold text-white mb-4">
-          {{ showEditModal ? 'Edit Link' : 'Create New Link' }}
+          {{ showEditModal ? '编辑链接' : '创建新链接' }}
         </h3>
 
         <div class="space-y-6">
           <div>
-            <label class="label">Link Alias</label>
+            <label class="label">链接名称</label>
             <input
               v-model="newAlias"
               type="text"
               class="input"
-              placeholder="e.g. Client Name"
+              placeholder="例如：客户名称"
             />
           </div>
 
@@ -250,12 +250,12 @@ function openCreateModal() {
                 :class="newAllowRaw ? 'left-7' : 'left-1'"
               ></span>
             </button>
-            <span class="text-gray-300">Allow RAW downloads</span>
+            <span class="text-gray-300">允许下载 RAW 文件</span>
           </div>
 
           <div>
-            <label class="label">Hidden Photos (click to toggle)</label>
-            <p class="text-sm text-gray-500 mb-3">Selected photos will be hidden from this link</p>
+            <label class="label">隐藏的照片（点击切换）</label>
+            <p class="text-sm text-gray-500 mb-3">选中的照片将不会在此链接中显示</p>
             <div class="grid grid-cols-4 sm:grid-cols-6 gap-2 max-h-64 overflow-y-auto p-1">
               <div
                 v-for="photo in photos"
@@ -291,13 +291,13 @@ function openCreateModal() {
             @click="showCreateModal = false; showEditModal = false; resetForm()"
             class="btn btn-secondary flex-1"
           >
-            Cancel
+            取消
           </button>
           <button
             @click="showEditModal ? updateLink() : createLink()"
             class="btn btn-primary flex-1"
           >
-            {{ showEditModal ? 'Save Changes' : 'Create Link' }}
+            {{ showEditModal ? '保存更改' : '创建链接' }}
           </button>
         </div>
       </div>

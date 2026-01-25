@@ -37,7 +37,7 @@ async function createProject() {
 }
 
 async function handleDelete(project) {
-  if (confirm(`Delete project "${project.name}"?`)) {
+  if (confirm(`确定要删除项目 "${project.name}" 吗？`)) {
     await projectStore.deleteProject(project.id)
   }
 }
@@ -72,7 +72,7 @@ function getCoverUrl(project) {
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
           </svg>
-          Logout
+          退出登录
         </button>
       </div>
     </header>
@@ -80,12 +80,12 @@ function getCoverUrl(project) {
     <!-- Main content -->
     <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div class="flex items-center justify-between mb-8">
-        <h2 class="text-2xl font-bold text-white">Projects</h2>
+        <h2 class="text-2xl font-bold text-white">项目列表</h2>
         <button @click="showCreateModal = true" class="btn btn-primary">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
           </svg>
-          New Project
+          新建项目
         </button>
       </div>
 
@@ -104,10 +104,10 @@ function getCoverUrl(project) {
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
           </svg>
         </div>
-        <h3 class="text-lg font-medium text-white mb-2">No projects yet</h3>
-        <p class="text-gray-400 mb-4">Create your first project to get started</p>
+        <h3 class="text-lg font-medium text-white mb-2">暂无项目</h3>
+        <p class="text-gray-400 mb-4">创建您的第一个项目开始使用</p>
         <button @click="showCreateModal = true" class="btn btn-primary">
-          Create Project
+          创建项目
         </button>
       </div>
 
@@ -137,7 +137,7 @@ function getCoverUrl(project) {
           <!-- Info -->
           <div class="p-4">
             <h3 class="font-semibold text-white truncate">{{ project.name }}</h3>
-            <p class="text-sm text-gray-400 mt-1">{{ project.photo_count || 0 }} photos</p>
+            <p class="text-sm text-gray-400 mt-1">{{ project.photo_count || 0 }} 张照片</p>
           </div>
 
           <!-- Actions -->
@@ -149,7 +149,7 @@ function getCoverUrl(project) {
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
               </svg>
-              Links
+              分享链接
             </button>
             <button
               @click.stop="handleDelete(project)"
@@ -167,36 +167,36 @@ function getCoverUrl(project) {
     <!-- Create Modal -->
     <div v-if="showCreateModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
       <div class="card p-6 w-full max-w-md" @click.stop>
-        <h3 class="text-lg font-semibold text-white mb-4">Create New Project</h3>
+        <h3 class="text-lg font-semibold text-white mb-4">新建项目</h3>
 
         <div class="space-y-4">
           <div>
-            <label class="label">Project Name</label>
+            <label class="label">项目名称</label>
             <input
               v-model="newProjectName"
               type="text"
               class="input"
-              placeholder="e.g. Wedding 2024"
+              placeholder="例如：婚礼摄影 2024"
             />
           </div>
 
           <div>
-            <label class="label">Description (optional)</label>
+            <label class="label">项目描述（可选）</label>
             <textarea
               v-model="newProjectDesc"
               class="input resize-none"
               rows="3"
-              placeholder="Project description..."
+              placeholder="输入项目描述..."
             ></textarea>
           </div>
         </div>
 
         <div class="flex gap-3 mt-6">
           <button @click="showCreateModal = false" class="btn btn-secondary flex-1">
-            Cancel
+            取消
           </button>
           <button @click="createProject" class="btn btn-primary flex-1" :disabled="creating">
-            {{ creating ? 'Creating...' : 'Create' }}
+            {{ creating ? '创建中...' : '创建' }}
           </button>
         </div>
       </div>

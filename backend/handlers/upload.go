@@ -10,6 +10,7 @@ import (
 	"photobridge/config"
 	"photobridge/database"
 	"photobridge/models"
+	"photobridge/utils"
 
 	"github.com/gin-gonic/gin"
 )
@@ -68,11 +69,16 @@ func UploadPhotos(c *gin.Context) {
 				existingPhoto.HasRaw = true
 			} else if models.IsImageExtension(ext) {
 				existingPhoto.NormalExt = ext
+				// 清除旧缩略图，浏览时会按需重新生成
+				existingPhoto.ThumbSmall = nil
+				existingPhoto.ThumbLarge = nil
+				existingPhoto.ThumbWidth = 0
+				existingPhoto.ThumbHeight = 0
 			}
 			database.DB.Save(&existingPhoto)
 			uploadedPhotos = append(uploadedPhotos, existingPhoto)
 		} else {
-			// Create new photo
+			// Create new photo (不生成缩略图，浏览时按需生成)
 			photo := models.Photo{
 				ProjectID: project.ID,
 				BaseName:  baseName,
@@ -102,6 +108,14 @@ func UploadPhotos(c *gin.Context) {
 
 func UploadViaAPI(c *gin.Context) {
 	projectName := c.Param("project")
+
+	// 验证项目名称安全性（防止路径遍历攻击）
+	sanitizedName, valid := utils.SanitizeProjectName(projectName)
+	if !valid {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid project name"})
+		return
+	}
+	projectName = sanitizedName
 
 	// Find or create project
 	var project models.Project
@@ -155,9 +169,15 @@ func UploadViaAPI(c *gin.Context) {
 				existingPhoto.HasRaw = true
 			} else if models.IsImageExtension(ext) {
 				existingPhoto.NormalExt = ext
+				// 清除旧缩略图，浏览时会按需重新生成
+				existingPhoto.ThumbSmall = nil
+				existingPhoto.ThumbLarge = nil
+				existingPhoto.ThumbWidth = 0
+				existingPhoto.ThumbHeight = 0
 			}
 			database.DB.Save(&existingPhoto)
 		} else {
+			// Create new photo (不生成缩略图，浏览时按需生成)
 			photo := models.Photo{
 				ProjectID: project.ID,
 				BaseName:  baseName,

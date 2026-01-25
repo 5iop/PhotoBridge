@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -11,6 +12,7 @@ import (
 	"photobridge/database"
 	"photobridge/middleware"
 	"photobridge/models"
+	"photobridge/utils"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
@@ -141,6 +143,11 @@ func UpdateProject(c *gin.Context) {
 
 	updates := map[string]interface{}{}
 	if req.Name != "" {
+		// 验证项目名称安全性
+		if _, valid := utils.SanitizeProjectName(req.Name); !valid {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid project name"})
+			return
+		}
 		updates["name"] = req.Name
 	}
 	if req.Description != "" {
@@ -150,7 +157,13 @@ func UpdateProject(c *gin.Context) {
 		updates["cover_photo"] = req.CoverPhoto
 	}
 
-	database.DB.Model(&project).Updates(updates)
+	if err := database.DB.Model(&project).Updates(updates).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update project"})
+		return
+	}
+
+	// 重新加载更新后的项目
+	database.DB.First(&project, id)
 	c.JSON(http.StatusOK, project)
 }
 
@@ -292,8 +305,62 @@ func DeletePhoto(c *gin.Context) {
 	}
 
 	// Delete exclusions
-	database.DB.Where("photo_id = ?", photo.ID).Delete(&models.PhotoExclusion{})
-	database.DB.Delete(&photo)
+	if err := database.DB.Where("photo_id = ?", photo.ID).Delete(&models.PhotoExclusion{}).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete photo exclusions"})
+		return
+	}
+
+	if err := database.DB.Delete(&photo).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete photo"})
+		return
+	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Photo deleted"})
+}
+
+// GetPhotoFiles returns the list of files for a photo
+func GetPhotoFiles(c *gin.Context) {
+	photoID := c.Param("id")
+	var photo models.Photo
+
+	if err := database.DB.First(&photo, photoID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Photo not found"})
+		return
+	}
+
+	var project models.Project
+	database.DB.First(&project, photo.ProjectID)
+
+	type FileInfo struct {
+		Type     string `json:"type"`
+		Filename string `json:"filename"`
+		URL      string `json:"url"`
+		Ext      string `json:"ext"`
+	}
+
+	var files []FileInfo
+
+	// URL编码项目名称和文件名，防止特殊字符问题
+	encodedProjectName := url.PathEscape(project.Name)
+	encodedBaseName := url.PathEscape(photo.BaseName)
+
+	if photo.NormalExt != "" {
+		files = append(files, FileInfo{
+			Type:     "normal",
+			Filename: photo.BaseName + photo.NormalExt,
+			URL:      "/uploads/" + encodedProjectName + "/" + encodedBaseName + photo.NormalExt,
+			Ext:      photo.NormalExt,
+		})
+	}
+
+	if photo.HasRaw && photo.RawExt != "" {
+		files = append(files, FileInfo{
+			Type:     "raw",
+			Filename: photo.BaseName + photo.RawExt,
+			URL:      "/uploads/" + encodedProjectName + "/" + encodedBaseName + photo.RawExt,
+			Ext:      photo.RawExt,
+		})
+	}
+
+	c.JSON(http.StatusOK, files)
 }

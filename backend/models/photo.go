@@ -7,15 +7,20 @@ import (
 )
 
 type Photo struct {
-	ID        uint           `gorm:"primarykey" json:"id"`
-	ProjectID uint           `gorm:"index;not null" json:"project_id"`
-	BaseName  string         `gorm:"size:255;not null" json:"base_name"`
-	NormalExt string         `gorm:"size:10" json:"normal_ext"`
-	RawExt    string         `gorm:"size:10" json:"raw_ext"`
-	HasRaw    bool           `gorm:"default:false" json:"has_raw"`
-	CreatedAt time.Time      `json:"created_at"`
-	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
-	Project   Project        `gorm:"foreignKey:ProjectID" json:"-"`
+	ID            uint           `gorm:"primarykey" json:"id"`
+	ProjectID     uint           `gorm:"index;not null" json:"project_id"`
+	BaseName      string         `gorm:"size:255;not null" json:"base_name"`
+	NormalExt     string         `gorm:"size:10" json:"normal_ext"`
+	RawExt        string         `gorm:"size:10" json:"raw_ext"`
+	HasRaw        bool           `gorm:"default:false" json:"has_raw"`
+	ThumbSmall    []byte         `gorm:"type:blob" json:"-"`           // 列表缩略图 ~300px
+	ThumbLarge    []byte         `gorm:"type:blob" json:"-"`           // 预览缩略图 ~1200px
+	ThumbWidth    int            `json:"thumb_width,omitempty"`        // 缩略图宽度
+	ThumbHeight   int            `json:"thumb_height,omitempty"`       // 缩略图高度
+	CreatedAt     time.Time      `json:"created_at"`
+	UpdatedAt     time.Time      `json:"updated_at"`
+	DeletedAt     gorm.DeletedAt `gorm:"index" json:"-"`
+	Project       Project        `gorm:"foreignKey:ProjectID" json:"-"`
 }
 
 // IsRawExtension checks if the given extension is a RAW format

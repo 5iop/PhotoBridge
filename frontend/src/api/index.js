@@ -63,7 +63,18 @@ export const deleteShareLink = (id) => api.delete(`/admin/links/${id}`)
 // Public share
 export const getShareInfo = (token) => api.get(`/share/${token}`)
 export const getSharePhotos = (token) => api.get(`/share/${token}/photos`)
+export const getPhotoExif = (token, photoId) => api.get(`/share/${token}/photo/${photoId}/exif`)
+
+// Admin EXIF and files
+export const getAdminPhotoExif = (photoId) => api.get(`/admin/photos/${photoId}/exif`)
+export const getAdminPhotoFiles = (photoId) => api.get(`/admin/photos/${photoId}/files`)
 
 export const getUploadUrl = () => import.meta.env.VITE_API_URL || ''
+
+// Thumbnail URLs
+export const getAdminThumbSmallUrl = (photoId) => `${getUploadUrl()}/api/admin/photos/${photoId}/thumb/small`
+export const getAdminThumbLargeUrl = (photoId) => `${getUploadUrl()}/api/admin/photos/${photoId}/thumb/large`
+export const getShareThumbSmallUrl = (token, photoId) => `${getUploadUrl()}/api/share/${token}/photo/${photoId}/thumb/small`
+export const getShareThumbLargeUrl = (token, photoId) => `${getUploadUrl()}/api/share/${token}/photo/${photoId}/thumb/large`
 
 export default api

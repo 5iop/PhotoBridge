@@ -63,6 +63,10 @@ func main() {
 			admin.POST("/projects/:id/photos", handlers.UploadPhotos)
 			admin.GET("/projects/:id/photos", handlers.GetProjectPhotos)
 			admin.DELETE("/photos/:id", handlers.DeletePhoto)
+			admin.GET("/photos/:id/exif", handlers.GetAdminPhotoExif)
+			admin.GET("/photos/:id/files", handlers.GetPhotoFiles)
+			admin.GET("/photos/:id/thumb/small", handlers.GetPhotoThumbSmall)
+			admin.GET("/photos/:id/thumb/large", handlers.GetPhotoThumbLarge)
 
 			// Share links
 			admin.GET("/projects/:id/links", handlers.GetShareLinks)
@@ -84,6 +88,10 @@ func main() {
 			share.GET("/:token", handlers.GetShareInfo)
 			share.GET("/:token/photos", handlers.GetSharePhotos)
 			share.GET("/:token/photo/:photoId", handlers.GetSharePhoto)
+			share.GET("/:token/photo/:photoId/exif", handlers.GetPhotoExif)
+			share.GET("/:token/photo/:photoId/download", handlers.DownloadSinglePhoto)
+			share.GET("/:token/photo/:photoId/thumb/small", handlers.GetSharePhotoThumbSmall)
+			share.GET("/:token/photo/:photoId/thumb/large", handlers.GetSharePhotoThumbLarge)
 			share.GET("/:token/download", handlers.DownloadSharePhotos)
 		}
 	}
