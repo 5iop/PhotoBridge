@@ -9,7 +9,11 @@ if "%ADMIN_USERNAME%"=="" set ADMIN_USERNAME=admin
 if "%ADMIN_PASSWORD%"=="" set ADMIN_PASSWORD=admin123
 if "%API_KEY%"=="" set API_KEY=photobridge-api-key
 if "%JWT_SECRET%"=="" set JWT_SECRET=photobridge-jwt-secret
-if "%PORT%"=="" set PORT=8080
+if "%PORT%"=="" set PORT=8060
+
+echo ================================================
+echo   PhotoBridge Backend Server
+echo ================================================
 
 echo Admin Username: %ADMIN_USERNAME%
 echo Admin Password: %ADMIN_PASSWORD%

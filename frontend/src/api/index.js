@@ -1,7 +1,7 @@
 import axios from 'axios'
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8080/api',
+  baseURL: import.meta.env.VITE_API_URL || '/api',
   timeout: 30000,
 })
 
@@ -64,6 +64,6 @@ export const deleteShareLink = (id) => api.delete(`/admin/links/${id}`)
 export const getShareInfo = (token) => api.get(`/share/${token}`)
 export const getSharePhotos = (token) => api.get(`/share/${token}/photos`)
 
-export const getUploadUrl = () => import.meta.env.VITE_API_URL || 'http://localhost:8080'
+export const getUploadUrl = () => import.meta.env.VITE_API_URL || ''
 
 export default api
