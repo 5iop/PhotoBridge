@@ -1,8 +1,17 @@
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, reactive, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import * as api from '../../api'
-import { getUploadUrl, getAdminThumbSmallUrl, getAdminThumbLargeUrl } from '../../api'
+import { getUploadUrl, fetchAdminThumbSmall, fetchAdminThumbLarge, clearThumbCache } from '../../api'
+
+// FilePond imports
+import vueFilePond from 'vue-filepond'
+import 'filepond/dist/filepond.min.css'
+import 'filepond-plugin-image-preview/dist/filepond-plugin-image-preview.min.css'
+import FilePondPluginFileValidateType from 'filepond-plugin-file-validate-type'
+import FilePondPluginImagePreview from 'filepond-plugin-image-preview'
+
+const FilePond = vueFilePond(FilePondPluginFileValidateType, FilePondPluginImagePreview)
 
 const route = useRoute()
 const router = useRouter()
@@ -11,10 +20,12 @@ const project = ref(null)
 const photos = ref([])
 const links = ref([])
 const loading = ref(true)
-const uploading = ref(false)
-const uploadProgress = ref(0)
-const dragOver = ref(false)
 const selectedPhotos = ref(new Set())
+
+// FilePond
+const pond = ref(null)
+const uploadedCount = ref(0)
+const failedFiles = ref([])
 
 // Link management
 const showLinkModal = ref(false)
@@ -30,7 +41,16 @@ const previewFiles = ref([])
 const loadingExif = ref(false)
 const fullImageLoaded = ref(false)
 
+// Thumbnail blob URLs cache (reactive for Vue reactivity)
+const thumbUrls = reactive({})
+const largeThumbUrls = reactive({})
+
 const projectId = computed(() => route.params.id)
+
+onUnmounted(() => {
+  // Clean up blob URLs when component unmounts
+  clearThumbCache()
+})
 
 onMounted(async () => {
   await fetchData()
@@ -47,6 +67,13 @@ async function fetchData() {
     project.value = projectRes.data
     photos.value = photosRes.data || []
     links.value = linksRes.data || []
+
+    // Load thumbnails asynchronously (don't block UI)
+    for (const photo of photos.value) {
+      if (photo.normal_ext) {
+        loadThumbSmall(photo)
+      }
+    }
   } finally {
     loading.value = false
   }
@@ -62,13 +89,36 @@ function getPhotoUrl(photo) {
   return null
 }
 
-// 缩略图URL
+// 异步加载缩略图
+async function loadThumbSmall(photo) {
+  if (thumbUrls[photo.id]) return
+  const url = await fetchAdminThumbSmall(photo.id)
+  if (url) {
+    thumbUrls[photo.id] = url
+  } else {
+    // Fallback to original image URL
+    thumbUrls[photo.id] = getPhotoUrl(photo) || 'error'
+  }
+}
+
+async function loadThumbLarge(photo) {
+  if (largeThumbUrls[photo.id]) return
+  const url = await fetchAdminThumbLarge(photo.id)
+  if (url) {
+    largeThumbUrls[photo.id] = url
+  } else {
+    // Fallback to original image URL
+    largeThumbUrls[photo.id] = getPhotoUrl(photo) || 'error'
+  }
+}
+
+// 获取已加载的缩略图URL
 function getThumbSmallUrl(photo) {
-  return getAdminThumbSmallUrl(photo.id)
+  return thumbUrls[photo.id] || null
 }
 
 function getThumbLargeUrl(photo) {
-  return getAdminThumbLargeUrl(photo.id)
+  return largeThumbUrls[photo.id] || null
 }
 
 // 当前预加载的照片ID（防止快速切换时状态混乱）
@@ -99,6 +149,10 @@ function handleThumbError(event, photo) {
   if (url && !img.dataset.fallback) {
     img.dataset.fallback = 'true'
     img.src = url
+  } else if (!img.dataset.failed) {
+    // 最终降级：标记为失败，隐藏图片
+    img.dataset.failed = 'true'
+    img.style.display = 'none'
   }
 }
 
@@ -110,33 +164,86 @@ function handlePreviewThumbError(event) {
     img.dataset.fallback = 'true'
     img.src = url
     fullImageLoaded.value = true
+  } else if (!img.dataset.failed) {
+    // 最终降级：标记为失败
+    img.dataset.failed = 'true'
   }
 }
 
-async function handleFiles(files) {
-  if (!files.length) return
-  uploading.value = true
-  uploadProgress.value = 0
-  try {
-    await api.uploadPhotos(projectId.value, Array.from(files), (e) => {
-      uploadProgress.value = Math.round((e.loaded * 100) / e.total)
-    })
-    await fetchData()
-  } finally {
-    uploading.value = false
-    uploadProgress.value = 0
+// FilePond server configuration
+const filePondServer = computed(() => ({
+  process: (fieldName, file, metadata, load, error, progress, abort) => {
+    const formData = new FormData()
+    formData.append('files', file)
+
+    const token = localStorage.getItem('token')
+    const xhr = new XMLHttpRequest()
+
+    xhr.open('POST', `${getUploadUrl()}/api/admin/projects/${projectId.value}/photos`)
+    xhr.setRequestHeader('Authorization', `Bearer ${token}`)
+
+    xhr.upload.onprogress = (e) => {
+      progress(e.lengthComputable, e.loaded, e.total)
+    }
+
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        uploadedCount.value++
+        load(xhr.responseText)
+      } else {
+        failedFiles.value.push(file.name)
+        error('Upload failed')
+      }
+    }
+
+    xhr.onerror = () => {
+      failedFiles.value.push(file.name)
+      error('Network error')
+    }
+
+    xhr.send(formData)
+
+    return {
+      abort: () => {
+        xhr.abort()
+        abort()
+      }
+    }
   }
+}))
+
+// FilePond accepted file types
+const acceptedFileTypes = [
+  'image/*',
+  'image/x-canon-cr2',
+  'image/x-canon-cr3',
+  'image/x-nikon-nef',
+  'image/x-sony-arw',
+  'image/x-adobe-dng',
+  'image/x-olympus-orf',
+  'image/x-panasonic-rw2',
+  'image/x-pentax-pef',
+  'image/x-fuji-raf',
+  'image/x-samsung-srw',
+  'image/x-sigma-x3f'
+]
+
+function handleFilePondInit() {
+  // Reset counters when FilePond initializes
+  uploadedCount.value = 0
+  failedFiles.value = []
 }
 
-function handleDrop(e) {
-  e.preventDefault()
-  dragOver.value = false
-  handleFiles(e.dataTransfer.files)
-}
-
-function handleFileSelect(e) {
-  handleFiles(e.target.files)
-  e.target.value = ''
+function handleProcessFiles() {
+  // Called when all files have been processed
+  if (failedFiles.value.length > 0) {
+    alert(`上传完成，但 ${failedFiles.value.length} 个文件失败:\n${failedFiles.value.join('\n')}`)
+  }
+  // Refresh photo list
+  fetchData()
+  // Reset counters
+  uploadedCount.value = 0
+  failedFiles.value = []
 }
 
 function toggleSelect(photoId) {
@@ -188,6 +295,9 @@ async function openPreview(photo) {
   previewFiles.value = []
   loadingExif.value = true
   fullImageLoaded.value = false
+
+  // 加载大缩略图
+  loadThumbLarge(photo)
 
   // 开始预加载原图
   preloadFullImage(photo)
@@ -342,32 +452,23 @@ function toggleExclusion(photoId) {
       <div class="flex gap-6">
         <!-- Left: Photos -->
         <div class="flex-1 min-w-0">
-          <!-- Upload area -->
-          <div
-            class="card p-6 mb-6 border-2 border-dashed transition-all"
-            :class="dragOver ? 'border-primary-500 bg-primary-500/10' : 'border-dark-100'"
-            @dragover.prevent="dragOver = true"
-            @dragleave="dragOver = false"
-            @drop="handleDrop"
-          >
-            <div class="text-center">
-              <div v-if="uploading" class="space-y-2">
-                <div class="h-2 bg-dark-300 rounded-full overflow-hidden max-w-xs mx-auto">
-                  <div class="h-full bg-gradient-to-r from-primary-500 to-primary-400 transition-all" :style="{ width: `${uploadProgress}%` }"></div>
-                </div>
-                <p class="text-gray-400 text-sm">上传中... {{ uploadProgress }}%</p>
-              </div>
-              <div v-else class="flex items-center justify-center gap-4">
-                <svg class="w-8 h-8 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                </svg>
-                <span class="text-gray-400">拖拽文件到此处或</span>
-                <label class="btn btn-primary btn-sm cursor-pointer">
-                  浏览文件
-                  <input type="file" class="hidden" multiple accept="image/*,.raw,.cr2,.cr3,.nef,.arw,.dng,.orf,.rw2,.pef,.raf,.srw,.x3f" @change="handleFileSelect" />
-                </label>
-              </div>
-            </div>
+          <!-- FilePond Upload area -->
+          <div class="filepond-dark mb-6">
+            <FilePond
+              ref="pond"
+              name="files"
+              class-name="filepond--panel-root filepond--drop-label"
+              label-idle="拖拽文件到此处或 <span class='filepond--label-action'>浏览文件</span>"
+              :allow-multiple="true"
+              :allow-reorder="true"
+              :server="filePondServer"
+              :accepted-file-types="acceptedFileTypes"
+              :max-parallel-uploads="3"
+              :instant-upload="true"
+              credits=""
+              @init="handleFilePondInit"
+              @processfiles="handleProcessFiles"
+            />
           </div>
 
           <!-- Toolbar -->
@@ -400,7 +501,16 @@ function toggleExclusion(photoId) {
               :class="selectedPhotos.has(photo.id) ? 'ring-2 ring-primary-500' : ''"
               @click="toggleSelect(photo.id)"
             >
-              <img v-if="photo.normal_ext" :src="getThumbSmallUrl(photo)" class="w-full h-full object-cover" loading="lazy" @error="handleThumbError($event, photo)" />
+              <!-- 有缩略图URL时显示图片 -->
+              <img v-if="photo.normal_ext && getThumbSmallUrl(photo)" :src="getThumbSmallUrl(photo)" class="w-full h-full object-cover" loading="lazy" @error="handleThumbError($event, photo)" />
+              <!-- 正在加载缩略图时显示加载器 -->
+              <div v-else-if="photo.normal_ext && !getThumbSmallUrl(photo)" class="w-full h-full flex items-center justify-center bg-dark-300">
+                <svg class="w-6 h-6 text-gray-500 spinner" fill="none" viewBox="0 0 24 24">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                </svg>
+              </div>
+              <!-- 只有RAW时显示提示 -->
               <div v-else class="w-full h-full flex flex-col items-center justify-center text-gray-500">
                 <svg class="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -516,13 +626,20 @@ function toggleExclusion(photoId) {
             <span class="text-lg">只有RAW文件</span>
             <span class="text-sm text-gray-500 mt-1">无法预览，请下载查看</span>
           </div>
-          <!-- 大缩略图作为占位 -->
+          <!-- 大缩略图作为占位（有URL时显示） -->
           <img
-            v-else-if="!fullImageLoaded"
+            v-else-if="!fullImageLoaded && getThumbLargeUrl(previewPhoto)"
             :src="getThumbLargeUrl(previewPhoto)"
             class="max-w-full max-h-full object-contain"
             @error="handlePreviewThumbError"
           />
+          <!-- 大缩略图正在加载时显示加载器 -->
+          <div v-else-if="!fullImageLoaded && !getThumbLargeUrl(previewPhoto)" class="flex items-center justify-center py-20">
+            <svg class="w-12 h-12 text-primary-500 spinner" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+            </svg>
+          </div>
           <!-- 原图 (加载完成后显示) -->
           <img
             v-else
@@ -587,18 +704,6 @@ function toggleExclusion(photoId) {
 
             <!-- EXIF Data -->
             <template v-else-if="previewExif">
-              <!-- Camera -->
-              <div v-if="previewExif.camera_make || previewExif.camera_model">
-                <p class="text-xs text-gray-500 uppercase tracking-wide mb-1">相机</p>
-                <p class="text-white text-sm">{{ previewExif.camera_make }} {{ previewExif.camera_model }}</p>
-              </div>
-
-              <!-- Lens -->
-              <div v-if="previewExif.lens_model">
-                <p class="text-xs text-gray-500 uppercase tracking-wide mb-1">镜头</p>
-                <p class="text-white text-sm">{{ previewExif.lens_model }}</p>
-              </div>
-
               <!-- Shooting params -->
               <div v-if="previewExif.focal_length || previewExif.aperture || previewExif.shutter_speed || previewExif.iso" class="grid grid-cols-2 gap-3">
                 <div v-if="previewExif.focal_length">
@@ -664,7 +769,7 @@ function toggleExclusion(photoId) {
               </div>
 
               <!-- No EXIF -->
-              <div v-if="!previewExif.camera_make && !previewExif.focal_length && !previewExif.date_time" class="text-gray-500 text-sm">
+              <div v-if="!previewExif.focal_length && !previewExif.date_time" class="text-gray-500 text-sm">
                 无可用的 EXIF 信息
               </div>
             </template>
@@ -701,7 +806,13 @@ function toggleExclusion(photoId) {
                 :class="newExclusions.has(photo.id) ? 'ring-2 ring-red-500' : 'ring-1 ring-dark-100'"
                 @click="toggleExclusion(photo.id)"
               >
-                <img v-if="photo.normal_ext" :src="getThumbSmallUrl(photo)" class="w-full h-full object-cover" :class="newExclusions.has(photo.id) ? 'opacity-40' : ''" @error="handleThumbError($event, photo)" />
+                <img v-if="photo.normal_ext && getThumbSmallUrl(photo)" :src="getThumbSmallUrl(photo)" class="w-full h-full object-cover" :class="newExclusions.has(photo.id) ? 'opacity-40' : ''" @error="handleThumbError($event, photo)" />
+                <div v-else-if="photo.normal_ext && !getThumbSmallUrl(photo)" class="w-full h-full bg-dark-300 flex items-center justify-center">
+                  <svg class="w-4 h-4 text-gray-500 spinner" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                  </svg>
+                </div>
                 <div v-else class="w-full h-full bg-dark-300 flex items-center justify-center text-[8px] text-gray-500">只有RAW</div>
                 <div v-if="newExclusions.has(photo.id)" class="absolute inset-0 flex items-center justify-center">
                   <svg class="w-4 h-4 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -725,5 +836,102 @@ function toggleExclusion(photoId) {
 <style scoped>
 .btn-sm {
   @apply py-1.5 px-3 text-sm;
+}
+</style>
+
+<style>
+/* FilePond dark theme */
+.filepond-dark .filepond--panel-root {
+  background-color: #1e1e2e;
+  border: 2px dashed #3d3d5c;
+  border-radius: 0.75rem;
+}
+
+.filepond-dark .filepond--drop-label {
+  color: #9ca3af;
+  font-size: 0.9rem;
+}
+
+.filepond-dark .filepond--drop-label label {
+  cursor: pointer;
+}
+
+.filepond-dark .filepond--label-action {
+  color: #8b5cf6;
+  text-decoration: underline;
+  text-decoration-color: rgba(139, 92, 246, 0.4);
+}
+
+.filepond-dark .filepond--label-action:hover {
+  color: #a78bfa;
+}
+
+.filepond-dark .filepond--item-panel {
+  background-color: #2d2d44;
+  border-radius: 0.5rem;
+}
+
+.filepond-dark .filepond--file-action-button {
+  cursor: pointer;
+  color: white;
+  background-color: rgba(0, 0, 0, 0.5);
+}
+
+.filepond-dark .filepond--file-action-button:hover {
+  background-color: rgba(0, 0, 0, 0.7);
+}
+
+.filepond-dark .filepond--file {
+  color: white;
+}
+
+.filepond-dark .filepond--file-info {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.filepond-dark .filepond--file-info .filepond--file-info-sub {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.filepond-dark .filepond--file-status {
+  color: rgba(255, 255, 255, 0.65);
+}
+
+.filepond-dark .filepond--drip-blob {
+  background-color: #8b5cf6;
+}
+
+/* Processing state */
+.filepond-dark .filepond--item[data-filepond-item-state='processing'] .filepond--item-panel {
+  background-color: #3730a3;
+}
+
+.filepond-dark .filepond--item[data-filepond-item-state='processing-complete'] .filepond--item-panel {
+  background-color: #065f46;
+}
+
+/* Error state */
+.filepond-dark [data-filepond-item-state='processing-error'] .filepond--item-panel,
+.filepond-dark [data-filepond-item-state='load-error'] .filepond--item-panel {
+  background-color: #991b1b;
+}
+
+/* Progress indicator */
+.filepond-dark .filepond--progress-indicator {
+  color: white;
+}
+
+.filepond-dark .filepond--load-indicator {
+  color: white;
+}
+
+/* Image preview plugin */
+.filepond-dark .filepond--image-preview-overlay-idle {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.filepond-dark .filepond--image-preview-wrapper {
+  border-radius: 0.375rem;
+  overflow: hidden;
 }
 </style>

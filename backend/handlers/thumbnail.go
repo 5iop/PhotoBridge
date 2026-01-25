@@ -1,10 +1,10 @@
 package handlers
 
 import (
-	"fmt"
 	"log"
 	"net/http"
 	"path/filepath"
+	"strconv"
 	"sync"
 
 	"photobridge/config"
@@ -57,154 +57,117 @@ func generateThumbsAsync(photo *models.Photo, projectName string) {
 	}()
 }
 
-// GetPhotoThumbSmall 获取列表用小缩略图
-func GetPhotoThumbSmall(c *gin.Context) {
-	photoID := c.Param("id")
-	var photo models.Photo
-
-	if err := database.DB.First(&photo, photoID).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Photo not found"})
-		return
-	}
-
+// serveThumb is a unified handler for serving thumbnails
+// size: "small" or "large"
+func serveThumb(c *gin.Context, photo *models.Photo, size string) {
 	// 如果只有RAW没有普通图片
 	if photo.NormalExt == "" {
 		c.JSON(http.StatusNotFound, gin.H{"error": "raw_only", "message": "只有RAW文件"})
 		return
 	}
 
-	// 如果有普通图片但没有缩略图，异步生成
-	if len(photo.ThumbSmall) == 0 {
+	// 获取对应大小的缩略图数据
+	var thumbData []byte
+	if size == "small" {
+		thumbData = photo.ThumbSmall
+	} else {
+		thumbData = photo.ThumbLarge
+	}
+
+	// 如果没有缩略图，异步生成
+	if len(thumbData) == 0 {
 		var project models.Project
 		database.DB.First(&project, photo.ProjectID)
-		generateThumbsAsync(&photo, project.Name)
+		generateThumbsAsync(photo, project.Name)
 		c.JSON(http.StatusAccepted, gin.H{"error": "generating", "message": "正在生成缩略图"})
 		return
 	}
 
 	c.Header("Content-Type", "image/jpeg")
 	c.Header("Cache-Control", "public, max-age=31536000")
-	c.Data(http.StatusOK, "image/jpeg", photo.ThumbSmall)
+	c.Data(http.StatusOK, "image/jpeg", thumbData)
+}
+
+// getAdminPhoto retrieves a photo for admin endpoints
+func getAdminPhoto(c *gin.Context) (*models.Photo, bool) {
+	photoID := c.Param("id")
+	var photo models.Photo
+
+	if err := database.DB.First(&photo, photoID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Photo not found"})
+		return nil, false
+	}
+
+	return &photo, true
+}
+
+// getSharePhoto retrieves a photo for share endpoints with validation
+func getSharePhoto(c *gin.Context) (*models.Photo, bool) {
+	token := c.Param("token")
+	photoIDStr := c.Param("photoId")
+
+	photoIDUint, err := strconv.ParseUint(photoIDStr, 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid photo ID"})
+		return nil, false
+	}
+
+	// 验证分享链接
+	var link models.ShareLink
+	if err := database.DB.Preload("Exclusions").Where("token = ?", token).First(&link).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Share link not found"})
+		return nil, false
+	}
+
+	// 检查照片是否被排除
+	for _, exclusion := range link.Exclusions {
+		if exclusion.PhotoID == uint(photoIDUint) {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Photo not accessible"})
+			return nil, false
+		}
+	}
+
+	var photo models.Photo
+	if err := database.DB.Where("id = ? AND project_id = ?", photoIDUint, link.ProjectID).First(&photo).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Photo not found"})
+		return nil, false
+	}
+
+	return &photo, true
+}
+
+// GetPhotoThumbSmall 获取列表用小缩略图
+func GetPhotoThumbSmall(c *gin.Context) {
+	photo, ok := getAdminPhoto(c)
+	if !ok {
+		return
+	}
+	serveThumb(c, photo, "small")
 }
 
 // GetPhotoThumbLarge 获取预览用大缩略图
 func GetPhotoThumbLarge(c *gin.Context) {
-	photoID := c.Param("id")
-	var photo models.Photo
-
-	if err := database.DB.First(&photo, photoID).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Photo not found"})
+	photo, ok := getAdminPhoto(c)
+	if !ok {
 		return
 	}
-
-	// 如果只有RAW没有普通图片
-	if photo.NormalExt == "" {
-		c.JSON(http.StatusNotFound, gin.H{"error": "raw_only", "message": "只有RAW文件"})
-		return
-	}
-
-	// 如果有普通图片但没有缩略图，异步生成
-	if len(photo.ThumbLarge) == 0 {
-		var project models.Project
-		database.DB.First(&project, photo.ProjectID)
-		generateThumbsAsync(&photo, project.Name)
-		c.JSON(http.StatusAccepted, gin.H{"error": "generating", "message": "正在生成缩略图"})
-		return
-	}
-
-	c.Header("Content-Type", "image/jpeg")
-	c.Header("Cache-Control", "public, max-age=31536000")
-	c.Data(http.StatusOK, "image/jpeg", photo.ThumbLarge)
+	serveThumb(c, photo, "large")
 }
 
 // GetSharePhotoThumbSmall 分享页面获取小缩略图
 func GetSharePhotoThumbSmall(c *gin.Context) {
-	token := c.Param("token")
-	photoID := c.Param("photoId")
-
-	// 验证分享链接
-	var link models.ShareLink
-	if err := database.DB.Preload("Exclusions").Where("token = ?", token).First(&link).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Share link not found"})
+	photo, ok := getSharePhoto(c)
+	if !ok {
 		return
 	}
-
-	// 检查照片是否被排除
-	for _, exclusion := range link.Exclusions {
-		if fmt.Sprintf("%d", exclusion.PhotoID) == photoID {
-			c.JSON(http.StatusForbidden, gin.H{"error": "Photo not accessible"})
-			return
-		}
-	}
-
-	var photo models.Photo
-	if err := database.DB.Where("id = ? AND project_id = ?", photoID, link.ProjectID).First(&photo).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Photo not found"})
-		return
-	}
-
-	// 如果只有RAW没有普通图片
-	if photo.NormalExt == "" {
-		c.JSON(http.StatusNotFound, gin.H{"error": "raw_only", "message": "只有RAW文件"})
-		return
-	}
-
-	// 如果有普通图片但没有缩略图，异步生成
-	if len(photo.ThumbSmall) == 0 {
-		var project models.Project
-		database.DB.First(&project, photo.ProjectID)
-		generateThumbsAsync(&photo, project.Name)
-		c.JSON(http.StatusAccepted, gin.H{"error": "generating", "message": "正在生成缩略图"})
-		return
-	}
-
-	c.Header("Content-Type", "image/jpeg")
-	c.Header("Cache-Control", "public, max-age=31536000")
-	c.Data(http.StatusOK, "image/jpeg", photo.ThumbSmall)
+	serveThumb(c, photo, "small")
 }
 
 // GetSharePhotoThumbLarge 分享页面获取大缩略图
 func GetSharePhotoThumbLarge(c *gin.Context) {
-	token := c.Param("token")
-	photoID := c.Param("photoId")
-
-	// 验证分享链接
-	var link models.ShareLink
-	if err := database.DB.Preload("Exclusions").Where("token = ?", token).First(&link).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Share link not found"})
+	photo, ok := getSharePhoto(c)
+	if !ok {
 		return
 	}
-
-	// 检查照片是否被排除
-	for _, exclusion := range link.Exclusions {
-		if fmt.Sprintf("%d", exclusion.PhotoID) == photoID {
-			c.JSON(http.StatusForbidden, gin.H{"error": "Photo not accessible"})
-			return
-		}
-	}
-
-	var photo models.Photo
-	if err := database.DB.Where("id = ? AND project_id = ?", photoID, link.ProjectID).First(&photo).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Photo not found"})
-		return
-	}
-
-	// 如果只有RAW没有普通图片
-	if photo.NormalExt == "" {
-		c.JSON(http.StatusNotFound, gin.H{"error": "raw_only", "message": "只有RAW文件"})
-		return
-	}
-
-	// 如果有普通图片但没有缩略图，异步生成
-	if len(photo.ThumbLarge) == 0 {
-		var project models.Project
-		database.DB.First(&project, photo.ProjectID)
-		generateThumbsAsync(&photo, project.Name)
-		c.JSON(http.StatusAccepted, gin.H{"error": "generating", "message": "正在生成缩略图"})
-		return
-	}
-
-	c.Header("Content-Type", "image/jpeg")
-	c.Header("Cache-Control", "public, max-age=31536000")
-	c.Data(http.StatusOK, "image/jpeg", photo.ThumbLarge)
+	serveThumb(c, photo, "large")
 }

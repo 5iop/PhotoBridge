@@ -2,12 +2,24 @@ package utils
 
 import (
 	"archive/zip"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 )
 
+// MaxFilesPerZip limits the number of files in a single zip download to prevent abuse
+const MaxFilesPerZip = 1000
+
+// CreateZip creates a zip archive from a list of files using streaming.
+// This implementation is memory-efficient as it uses io.Copy which streams
+// file contents through a small buffer (typically 32KB) rather than loading
+// entire files into memory.
 func CreateZip(writer io.Writer, files []string, basePath string) error {
+	if len(files) > MaxFilesPerZip {
+		return fmt.Errorf("too many files (%d), maximum allowed is %d", len(files), MaxFilesPerZip)
+	}
+
 	zipWriter := zip.NewWriter(writer)
 	defer zipWriter.Close()
 

@@ -44,14 +44,6 @@ export const deleteProject = (id) => api.delete(`/admin/projects/${id}`)
 
 // Photos
 export const getProjectPhotos = (projectId) => api.get(`/admin/projects/${projectId}/photos`)
-export const uploadPhotos = (projectId, files, onProgress) => {
-  const formData = new FormData()
-  files.forEach((file) => formData.append('files', file))
-  return api.post(`/admin/projects/${projectId}/photos`, formData, {
-    headers: { 'Content-Type': 'multipart/form-data' },
-    onUploadProgress: onProgress,
-  })
-}
 export const deletePhoto = (id) => api.delete(`/admin/photos/${id}`)
 
 // Share links
@@ -71,10 +63,54 @@ export const getAdminPhotoFiles = (photoId) => api.get(`/admin/photos/${photoId}
 
 export const getUploadUrl = () => import.meta.env.VITE_API_URL || ''
 
-// Thumbnail URLs
-export const getAdminThumbSmallUrl = (photoId) => `${getUploadUrl()}/api/admin/photos/${photoId}/thumb/small`
-export const getAdminThumbLargeUrl = (photoId) => `${getUploadUrl()}/api/admin/photos/${photoId}/thumb/large`
+// Thumbnail URLs (share routes don't need auth)
 export const getShareThumbSmallUrl = (token, photoId) => `${getUploadUrl()}/api/share/${token}/photo/${photoId}/thumb/small`
 export const getShareThumbLargeUrl = (token, photoId) => `${getUploadUrl()}/api/share/${token}/photo/${photoId}/thumb/large`
+
+// Admin thumbnail fetchers - return blob URLs with auth
+const thumbCache = new Map()
+
+export const fetchAdminThumbSmall = async (photoId) => {
+  const cacheKey = `small-${photoId}`
+  if (thumbCache.has(cacheKey)) {
+    return thumbCache.get(cacheKey)
+  }
+  try {
+    const response = await api.get(`/admin/photos/${photoId}/thumb/small`, {
+      responseType: 'blob'
+    })
+    const blobUrl = URL.createObjectURL(response.data)
+    thumbCache.set(cacheKey, blobUrl)
+    return blobUrl
+  } catch (err) {
+    // Return null to trigger fallback
+    return null
+  }
+}
+
+export const fetchAdminThumbLarge = async (photoId) => {
+  const cacheKey = `large-${photoId}`
+  if (thumbCache.has(cacheKey)) {
+    return thumbCache.get(cacheKey)
+  }
+  try {
+    const response = await api.get(`/admin/photos/${photoId}/thumb/large`, {
+      responseType: 'blob'
+    })
+    const blobUrl = URL.createObjectURL(response.data)
+    thumbCache.set(cacheKey, blobUrl)
+    return blobUrl
+  } catch (err) {
+    return null
+  }
+}
+
+// Clear thumbnail cache (call when logging out or when photos change)
+export const clearThumbCache = () => {
+  for (const url of thumbCache.values()) {
+    URL.revokeObjectURL(url)
+  }
+  thumbCache.clear()
+}
 
 export default api

@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { useProjectStore } from '../../stores/project'
 import { useAuthStore } from '../../stores/auth'
 import { getUploadUrl } from '../../api'
+import Modal from '../../components/Modal.vue'
 
 const router = useRouter()
 const projectStore = useProjectStore()
@@ -49,7 +50,9 @@ function logout() {
 
 function getCoverUrl(project) {
   if (project.cover_photo) {
-    return `${getUploadUrl()}/uploads/${project.name}/${project.cover_photo}`
+    const encodedName = encodeURIComponent(project.name)
+    const encodedCover = encodeURIComponent(project.cover_photo)
+    return `${getUploadUrl()}/uploads/${encodedName}/${encodedCover}`
   }
   return null
 }
@@ -165,41 +168,37 @@ function getCoverUrl(project) {
     </main>
 
     <!-- Create Modal -->
-    <div v-if="showCreateModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-      <div class="card p-6 w-full max-w-md" @click.stop>
-        <h3 class="text-lg font-semibold text-white mb-4">新建项目</h3>
-
-        <div class="space-y-4">
-          <div>
-            <label class="label">项目名称</label>
-            <input
-              v-model="newProjectName"
-              type="text"
-              class="input"
-              placeholder="例如：婚礼摄影 2024"
-            />
-          </div>
-
-          <div>
-            <label class="label">项目描述（可选）</label>
-            <textarea
-              v-model="newProjectDesc"
-              class="input resize-none"
-              rows="3"
-              placeholder="输入项目描述..."
-            ></textarea>
-          </div>
+    <Modal :show="showCreateModal" title="新建项目" @close="showCreateModal = false">
+      <div class="space-y-4">
+        <div>
+          <label class="label">项目名称</label>
+          <input
+            v-model="newProjectName"
+            type="text"
+            class="input"
+            placeholder="例如：婚礼摄影 2024"
+          />
         </div>
 
-        <div class="flex gap-3 mt-6">
-          <button @click="showCreateModal = false" class="btn btn-secondary flex-1">
-            取消
-          </button>
-          <button @click="createProject" class="btn btn-primary flex-1" :disabled="creating">
-            {{ creating ? '创建中...' : '创建' }}
-          </button>
+        <div>
+          <label class="label">项目描述（可选）</label>
+          <textarea
+            v-model="newProjectDesc"
+            class="input resize-none"
+            rows="3"
+            placeholder="输入项目描述..."
+          ></textarea>
         </div>
       </div>
-    </div>
+
+      <div class="flex gap-3 mt-6">
+        <button @click="showCreateModal = false" class="btn btn-secondary flex-1">
+          取消
+        </button>
+        <button @click="createProject" class="btn btn-primary flex-1" :disabled="creating">
+          {{ creating ? '创建中...' : '创建' }}
+        </button>
+      </div>
+    </Modal>
   </div>
 </template>

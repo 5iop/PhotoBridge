@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
 
 	"photobridge/config"
 	"photobridge/database"
@@ -112,8 +113,14 @@ func GetSharePhotos(c *gin.Context) {
 
 func GetSharePhoto(c *gin.Context) {
 	token := c.Param("token")
-	photoID := c.Param("photoId")
+	photoIDStr := c.Param("photoId")
 	photoType := c.DefaultQuery("type", "normal") // normal or raw
+
+	photoIDUint, err := strconv.ParseUint(photoIDStr, 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid photo ID"})
+		return
+	}
 
 	var link models.ShareLink
 	result := database.DB.Where("token = ?", token).Preload("Exclusions").First(&link)
@@ -124,7 +131,7 @@ func GetSharePhoto(c *gin.Context) {
 
 	// Check if photo is excluded
 	for _, e := range link.Exclusions {
-		if fmt.Sprintf("%d", e.PhotoID) == photoID {
+		if e.PhotoID == uint(photoIDUint) {
 			c.JSON(http.StatusForbidden, gin.H{"error": "Photo not accessible"})
 			return
 		}
@@ -132,7 +139,7 @@ func GetSharePhoto(c *gin.Context) {
 
 	var photo models.Photo
 	// 验证照片属于该分享链接的项目
-	if err := database.DB.Where("id = ? AND project_id = ?", photoID, link.ProjectID).First(&photo).Error; err != nil {
+	if err := database.DB.Where("id = ? AND project_id = ?", photoIDUint, link.ProjectID).First(&photo).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Photo not found"})
 		return
 	}
@@ -168,7 +175,13 @@ func GetSharePhoto(c *gin.Context) {
 // DownloadSinglePhoto - download a single photo with all its files (normal + raw) as zip
 func DownloadSinglePhoto(c *gin.Context) {
 	token := c.Param("token")
-	photoID := c.Param("photoId")
+	photoIDStr := c.Param("photoId")
+
+	photoIDUint, err := strconv.ParseUint(photoIDStr, 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid photo ID"})
+		return
+	}
 
 	var link models.ShareLink
 	result := database.DB.Where("token = ?", token).Preload("Exclusions").First(&link)
@@ -179,14 +192,14 @@ func DownloadSinglePhoto(c *gin.Context) {
 
 	// Check if photo is excluded
 	for _, e := range link.Exclusions {
-		if fmt.Sprintf("%d", e.PhotoID) == photoID {
+		if e.PhotoID == uint(photoIDUint) {
 			c.JSON(http.StatusForbidden, gin.H{"error": "Photo not accessible"})
 			return
 		}
 	}
 
 	var photo models.Photo
-	if err := database.DB.First(&photo, photoID).Error; err != nil {
+	if err := database.DB.Where("id = ? AND project_id = ?", photoIDUint, link.ProjectID).First(&photo).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Photo not found"})
 		return
 	}
@@ -229,8 +242,7 @@ func DownloadSinglePhoto(c *gin.Context) {
 	c.Header("Content-Type", "application/zip")
 	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", zipName))
 
-	err := utils.CreateZip(c.Writer, files, uploadDir)
-	if err != nil {
+	if err := utils.CreateZip(c.Writer, files, uploadDir); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create zip"})
 		return
 	}

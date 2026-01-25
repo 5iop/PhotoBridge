@@ -3,8 +3,11 @@ package handlers
 import (
 	"crypto/rand"
 	"encoding/base64"
+	"fmt"
 	"net/http"
 	"net/url"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -25,6 +28,21 @@ func generateShortToken() string {
 	token := base64.URLEncoding.EncodeToString(b)
 	token = strings.TrimRight(token, "=")
 	return token
+}
+
+// generateUniqueToken generates a unique share token with retry mechanism
+func generateUniqueToken() (string, error) {
+	maxRetries := 5
+	for i := 0; i < maxRetries; i++ {
+		token := generateShortToken()
+		// Check if token already exists
+		var count int64
+		database.DB.Model(&models.ShareLink{}).Where("token = ?", token).Count(&count)
+		if count == 0 {
+			return token, nil
+		}
+	}
+	return "", fmt.Errorf("failed to generate unique token after %d attempts", maxRetries)
 }
 
 type LoginRequest struct {
@@ -69,23 +87,25 @@ func Login(c *gin.Context) {
 // Project handlers
 func GetProjects(c *gin.Context) {
 	var projects []models.Project
-	result := database.DB.Preload("Photos").Find(&projects)
+	result := database.DB.Find(&projects)
 	if result.Error != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": result.Error.Error()})
 		return
 	}
 
-	// Add photo count to response
+	// Add photo count to response (使用Count而不是Preload，避免加载所有Photo数据)
 	type ProjectWithCount struct {
 		models.Project
-		PhotoCount int `json:"photo_count"`
+		PhotoCount int64 `json:"photo_count"`
 	}
 
 	var response []ProjectWithCount
 	for _, p := range projects {
+		var count int64
+		database.DB.Model(&models.Photo{}).Where("project_id = ?", p.ID).Count(&count)
 		response = append(response, ProjectWithCount{
 			Project:    p,
-			PhotoCount: len(p.Photos),
+			PhotoCount: count,
 		})
 	}
 
@@ -176,10 +196,24 @@ func DeleteProject(c *gin.Context) {
 		return
 	}
 
+	// 获取所有关联的分享链接，以便删除其排除规则
+	var linkIDs []uint
+	database.DB.Model(&models.ShareLink{}).Where("project_id = ?", id).Pluck("id", &linkIDs)
+	if len(linkIDs) > 0 {
+		database.DB.Where("link_id IN ?", linkIDs).Delete(&models.PhotoExclusion{})
+	}
+
 	// Delete associated photos and links
 	database.DB.Where("project_id = ?", id).Delete(&models.Photo{})
 	database.DB.Where("project_id = ?", id).Delete(&models.ShareLink{})
 	database.DB.Delete(&project)
+
+	// 删除项目的物理文件目录
+	uploadDir := filepath.Join(config.AppConfig.UploadDir, project.Name)
+	if err := os.RemoveAll(uploadDir); err != nil {
+		// 日志记录但不影响响应，因为数据库已清理
+		// 可以考虑在生产环境中添加日志
+	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Project deleted"})
 }
@@ -213,9 +247,15 @@ func CreateShareLink(c *gin.Context) {
 		return
 	}
 
+	token, err := generateUniqueToken()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate unique token"})
+		return
+	}
+
 	link := models.ShareLink{
 		ProjectID: project.ID,
-		Token:     generateShortToken(),
+		Token:     token,
 		Alias:     req.Alias,
 		AllowRaw:  req.AllowRaw,
 	}

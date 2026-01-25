@@ -89,6 +89,27 @@ function preloadFullImage(photo) {
   img.src = getPhotoUrl(photo)
 }
 
+// 获取当前照片的宽高比
+function getCurrentAspect() {
+  // 优先使用已加载的原图宽高比
+  if (imageAspect.value !== 1) {
+    return imageAspect.value
+  }
+
+  // 其次使用照片数据中的缩略图尺寸
+  if (lightboxPhoto.value?.thumb_width && lightboxPhoto.value?.thumb_height) {
+    return lightboxPhoto.value.thumb_width / lightboxPhoto.value.thumb_height
+  }
+
+  // 最后尝试从当前显示的图片元素获取
+  const imgElement = document.querySelector('#fullscreen-container img')
+  if (imgElement && imgElement.naturalWidth && imgElement.naturalHeight) {
+    return imgElement.naturalWidth / imgElement.naturalHeight
+  }
+
+  return 1 // 默认值
+}
+
 // 全屏模式
 async function enterFullscreen() {
   const container = document.getElementById('fullscreen-container')
@@ -105,7 +126,8 @@ async function enterFullscreen() {
     // 根据图片宽高比锁定屏幕方向
     if (screen.orientation && screen.orientation.lock) {
       try {
-        if (imageAspect.value > 1) {
+        const aspect = getCurrentAspect()
+        if (aspect > 1) {
           // 横向图片，锁定横屏
           await screen.orientation.lock('landscape')
         } else {
@@ -148,13 +170,18 @@ function handleFullscreenChange() {
   }
 }
 
-// 缩略图加载失败时，尝试用原图或稍后重试
+// 缩略图加载失败时，尝试用原图或显示占位图
 function handleThumbError(event, photo) {
   const img = event.target
-  // 如果有原图，降级使用原图
+  // 如果有原图，降级使用原图（仅一次）
   if (photo.normal_url && !img.dataset.fallback) {
     img.dataset.fallback = 'true'
     img.src = getPhotoUrl(photo)
+  } else if (!img.dataset.failed) {
+    // 最终降级：标记为失败，显示空状态
+    img.dataset.failed = 'true'
+    img.style.display = 'none'
+    // 父元素会显示只有RAW的提示样式（通过隐藏图片触发）
   }
 }
 
@@ -165,6 +192,9 @@ function handleLightboxThumbError(event) {
     img.dataset.fallback = 'true'
     img.src = getPhotoUrl(lightboxPhoto.value)
     fullImageLoaded.value = true // 直接显示原图
+  } else if (!img.dataset.failed) {
+    // 最终降级：标记为失败
+    img.dataset.failed = 'true'
   }
 }
 
@@ -522,14 +552,6 @@ function download() {
                   </svg>
                 </div>
                 <div v-else-if="lightboxExif" class="grid grid-cols-2 gap-2 text-sm">
-                  <div v-if="lightboxExif.camera_model" class="bg-dark-300 rounded-lg p-2">
-                    <p class="text-gray-500 text-xs">相机</p>
-                    <p class="text-white truncate">{{ lightboxExif.camera_model }}</p>
-                  </div>
-                  <div v-if="lightboxExif.lens_model" class="bg-dark-300 rounded-lg p-2">
-                    <p class="text-gray-500 text-xs">镜头</p>
-                    <p class="text-white truncate">{{ lightboxExif.lens_model }}</p>
-                  </div>
                   <div v-if="lightboxExif.focal_length" class="bg-dark-300 rounded-lg p-2">
                     <p class="text-gray-500 text-xs">焦距</p>
                     <p class="text-white">{{ lightboxExif.focal_length }}</p>
@@ -673,18 +695,6 @@ function download() {
 
             <!-- EXIF Data -->
             <div v-else-if="lightboxExif" class="space-y-4">
-              <!-- Camera -->
-              <div v-if="lightboxExif.camera_make || lightboxExif.camera_model">
-                <p class="text-xs text-gray-500 mb-1">相机</p>
-                <p class="text-white text-sm">{{ lightboxExif.camera_make }} {{ lightboxExif.camera_model }}</p>
-              </div>
-
-              <!-- Lens -->
-              <div v-if="lightboxExif.lens_model">
-                <p class="text-xs text-gray-500 mb-1">镜头</p>
-                <p class="text-white text-sm">{{ lightboxExif.lens_model }}</p>
-              </div>
-
               <!-- Shooting params -->
               <div v-if="lightboxExif.focal_length || lightboxExif.aperture || lightboxExif.shutter_speed || lightboxExif.iso" class="grid grid-cols-2 gap-3">
                 <div v-if="lightboxExif.focal_length">
@@ -750,7 +760,7 @@ function download() {
               </div>
 
               <!-- No EXIF -->
-              <div v-if="!lightboxExif.camera_make && !lightboxExif.focal_length && !lightboxExif.date_time" class="text-gray-500 text-sm">
+              <div v-if="!lightboxExif.focal_length && !lightboxExif.date_time" class="text-gray-500 text-sm">
                 无可用的 EXIF 信息
               </div>
             </div>
