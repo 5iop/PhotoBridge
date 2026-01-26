@@ -323,7 +323,7 @@ function download() {
 </script>
 
 <template>
-  <div class="min-h-screen bg-dark-600">
+  <div class="min-h-screen">
     <!-- Loading -->
     <div v-if="loading" class="min-h-screen flex items-center justify-center">
       <svg class="w-12 h-12 text-primary-500 spinner" fill="none" viewBox="0 0 24 24">
@@ -335,25 +335,25 @@ function download() {
     <!-- Error -->
     <div v-else-if="error" class="min-h-screen flex items-center justify-center p-4">
       <div class="text-center">
-        <div class="inline-flex items-center justify-center w-16 h-16 rounded-xl bg-red-500/20 mb-4">
-          <svg class="w-8 h-8 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div class="inline-flex items-center justify-center w-16 h-16 rounded-xl bg-red-100 mb-4">
+          <svg class="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
           </svg>
         </div>
-        <h2 class="text-xl font-bold text-white mb-2">出错了</h2>
-        <p class="text-gray-400">{{ error }}</p>
+        <h2 class="text-xl font-bold text-cf-text mb-2">出错了</h2>
+        <p class="text-cf-muted">{{ error }}</p>
       </div>
     </div>
 
     <!-- Gallery -->
     <div v-else>
       <!-- Header -->
-      <header class="sticky top-0 z-40 bg-dark-500/80 backdrop-blur-lg border-b border-dark-200">
+      <header class="sticky top-0 z-40 bg-white/80 backdrop-blur-lg border-b border-cf-border">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div class="flex items-center justify-between">
             <div>
-              <h1 class="text-xl sm:text-2xl font-bold text-white">{{ info.project_name }}</h1>
-              <p class="text-sm text-gray-400 mt-1">{{ info.photo_count }} 张照片</p>
+              <h1 class="text-xl sm:text-2xl font-bold text-cf-text">{{ info.project_name }}</h1>
+              <p class="text-sm text-cf-muted mt-1">{{ info.photo_count }} 张照片</p>
             </div>
             <button @click="showDownloadModal = true" class="btn btn-primary">
               <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -371,7 +371,7 @@ function download() {
           <div
             v-for="(photo, index) in photos"
             :key="photo.id"
-            class="aspect-square rounded-lg sm:rounded-xl overflow-hidden bg-dark-300 cursor-pointer group relative"
+            class="aspect-square rounded-lg sm:rounded-xl overflow-hidden bg-gray-100 cursor-pointer group relative"
             @click="openLightbox(index)"
           >
             <!-- 有普通图片时显示缩略图 -->
@@ -456,7 +456,7 @@ function download() {
           <!-- 顶部图片区域 -->
           <div class="relative flex-shrink-0 bg-black" style="height: 45vh;">
             <!-- 关闭按钮 -->
-            <button class="absolute top-3 right-3 p-2 rounded-full bg-white/20 text-white z-10" @click="closeLightbox">
+            <button class="absolute top-3 right-3 p-2 rounded-full bg-black/50 text-white z-10 hover:bg-black/70" @click="closeLightbox">
               <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
               </svg>
@@ -509,20 +509,20 @@ function download() {
           </div>
 
           <!-- 底部信息区域（可滚动） -->
-          <div class="flex-1 overflow-y-auto bg-dark-400">
+          <div class="flex-1 overflow-y-auto bg-white">
             <div class="p-4">
               <!-- 文件名 -->
-              <h3 class="text-base font-semibold text-white mb-3">{{ lightboxPhoto.base_name }}</h3>
+              <h3 class="text-base font-semibold text-cf-text mb-3">{{ lightboxPhoto.base_name }}</h3>
 
               <!-- 下载文件 -->
               <div class="mb-4">
-                <p class="text-xs text-gray-500 uppercase tracking-wide mb-2">下载</p>
+                <p class="text-xs text-cf-muted uppercase tracking-wide mb-2">下载</p>
                 <div class="flex flex-wrap gap-2">
                   <button
                     v-for="file in getPhotoFiles(lightboxPhoto)"
                     :key="file.url"
                     @click="downloadFile(file.url, file.filename)"
-                    class="flex items-center gap-2 px-3 py-2 rounded-lg bg-dark-300 text-white text-sm"
+                    class="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-100 text-cf-text text-sm"
                   >
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
@@ -544,7 +544,7 @@ function download() {
 
               <!-- EXIF -->
               <div>
-                <p class="text-xs text-gray-500 uppercase tracking-wide mb-2">拍摄参数</p>
+                <p class="text-xs text-cf-muted uppercase tracking-wide mb-2">拍摄参数</p>
                 <div v-if="loadingExif" class="flex justify-center py-4">
                   <svg class="w-5 h-5 text-primary-500 spinner" fill="none" viewBox="0 0 24 24">
                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -552,28 +552,28 @@ function download() {
                   </svg>
                 </div>
                 <div v-else-if="lightboxExif" class="grid grid-cols-2 gap-2 text-sm">
-                  <div v-if="lightboxExif.focal_length" class="bg-dark-300 rounded-lg p-2">
-                    <p class="text-gray-500 text-xs">焦距</p>
-                    <p class="text-white">{{ lightboxExif.focal_length }}</p>
+                  <div v-if="lightboxExif.focal_length" class="bg-gray-100 rounded-lg p-2">
+                    <p class="text-cf-muted text-xs">焦距</p>
+                    <p class="text-cf-text">{{ lightboxExif.focal_length }}</p>
                   </div>
-                  <div v-if="lightboxExif.aperture" class="bg-dark-300 rounded-lg p-2">
-                    <p class="text-gray-500 text-xs">光圈</p>
-                    <p class="text-white">{{ lightboxExif.aperture }}</p>
+                  <div v-if="lightboxExif.aperture" class="bg-gray-100 rounded-lg p-2">
+                    <p class="text-cf-muted text-xs">光圈</p>
+                    <p class="text-cf-text">{{ lightboxExif.aperture }}</p>
                   </div>
-                  <div v-if="lightboxExif.shutter_speed" class="bg-dark-300 rounded-lg p-2">
-                    <p class="text-gray-500 text-xs">快门</p>
-                    <p class="text-white">{{ lightboxExif.shutter_speed }}</p>
+                  <div v-if="lightboxExif.shutter_speed" class="bg-gray-100 rounded-lg p-2">
+                    <p class="text-cf-muted text-xs">快门</p>
+                    <p class="text-cf-text">{{ lightboxExif.shutter_speed }}</p>
                   </div>
-                  <div v-if="lightboxExif.iso" class="bg-dark-300 rounded-lg p-2">
-                    <p class="text-gray-500 text-xs">ISO</p>
-                    <p class="text-white">{{ lightboxExif.iso }}</p>
+                  <div v-if="lightboxExif.iso" class="bg-gray-100 rounded-lg p-2">
+                    <p class="text-cf-muted text-xs">ISO</p>
+                    <p class="text-cf-text">{{ lightboxExif.iso }}</p>
                   </div>
-                  <div v-if="lightboxExif.date_time" class="bg-dark-300 rounded-lg p-2 col-span-2">
-                    <p class="text-gray-500 text-xs">拍摄时间</p>
-                    <p class="text-white">{{ lightboxExif.date_time }}</p>
+                  <div v-if="lightboxExif.date_time" class="bg-gray-100 rounded-lg p-2 col-span-2">
+                    <p class="text-cf-muted text-xs">拍摄时间</p>
+                    <p class="text-cf-text">{{ lightboxExif.date_time }}</p>
                   </div>
                 </div>
-                <p v-else class="text-gray-500 text-sm">无 EXIF 信息</p>
+                <p v-else class="text-cf-muted text-sm">无 EXIF 信息</p>
               </div>
             </div>
           </div>
@@ -582,7 +582,7 @@ function download() {
         <!-- 桌面端：左右布局 -->
         <div class="hidden lg:flex h-full" @click="closeLightbox">
           <!-- 关闭按钮 -->
-          <button class="absolute top-4 right-4 p-2 rounded-full bg-white/10 hover:bg-white/20 text-white z-20" @click.stop="closeLightbox">
+          <button class="absolute top-4 right-4 p-2 rounded-full bg-black/50 hover:bg-black/70 text-white z-20" @click.stop="closeLightbox">
             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
             </svg>
@@ -627,35 +627,35 @@ function download() {
           </div>
 
           <!-- 右侧信息面板 -->
-          <div class="w-80 bg-dark-400 border-l border-dark-200 overflow-y-auto" @click.stop>
+          <div class="w-80 bg-white border-l border-cf-border overflow-y-auto" @click.stop>
             <div class="p-6">
               <!-- File name header -->
-              <h3 class="text-lg font-semibold text-white mb-1">{{ lightboxPhoto.base_name }}</h3>
-              <p class="text-sm text-gray-500 mb-6">照片详情</p>
+              <h3 class="text-lg font-semibold text-cf-text mb-1">{{ lightboxPhoto.base_name }}</h3>
+              <p class="text-sm text-cf-muted mb-6">照片详情</p>
 
           <!-- Files Section -->
           <div class="mb-6">
-            <p class="text-xs text-gray-500 uppercase tracking-wide mb-3">包含文件</p>
+            <p class="text-xs text-cf-muted uppercase tracking-wide mb-3">包含文件</p>
             <div class="space-y-2">
               <div
                 v-for="file in getPhotoFiles(lightboxPhoto)"
                 :key="file.url"
-                class="flex items-center justify-between p-3 rounded-xl bg-dark-300"
+                class="flex items-center justify-between p-3 rounded-xl bg-gray-50"
               >
                 <div class="flex items-center gap-3 min-w-0">
-                  <div class="w-10 h-10 rounded-lg flex items-center justify-center" :class="file.type === 'raw' ? 'bg-primary-500/20' : 'bg-gray-500/20'">
-                    <svg class="w-5 h-5" :class="file.type === 'raw' ? 'text-primary-400' : 'text-gray-400'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <div class="w-10 h-10 rounded-lg flex items-center justify-center" :class="file.type === 'raw' ? 'bg-primary-100' : 'bg-gray-100'">
+                    <svg class="w-5 h-5" :class="file.type === 'raw' ? 'text-primary-500' : 'text-gray-500'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                     </svg>
                   </div>
                   <div class="min-w-0">
-                    <p class="text-white text-sm font-medium truncate">{{ getExtLabel(file.ext) }}</p>
-                    <p class="text-xs text-gray-500 truncate">{{ file.filename }}</p>
+                    <p class="text-cf-text text-sm font-medium truncate">{{ getExtLabel(file.ext) }}</p>
+                    <p class="text-xs text-cf-muted truncate">{{ file.filename }}</p>
                   </div>
                 </div>
                 <button
                   @click="downloadFile(file.url, file.filename)"
-                  class="p-2 rounded-lg hover:bg-dark-200 text-gray-400 hover:text-white transition-colors"
+                  class="p-2 rounded-lg hover:bg-gray-100 text-cf-muted hover:text-cf-text transition-colors"
                   title="下载"
                 >
                   <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -679,11 +679,11 @@ function download() {
           </div>
 
           <!-- Divider -->
-          <div class="border-t border-dark-200 my-6"></div>
+          <div class="border-t border-cf-border my-6"></div>
 
           <!-- EXIF Section -->
           <div>
-            <p class="text-xs text-gray-500 uppercase tracking-wide mb-3">拍摄参数</p>
+            <p class="text-xs text-cf-muted uppercase tracking-wide mb-3">拍摄参数</p>
 
             <!-- Loading -->
             <div v-if="loadingExif" class="flex justify-center py-8">
@@ -698,69 +698,63 @@ function download() {
               <!-- Shooting params -->
               <div v-if="lightboxExif.focal_length || lightboxExif.aperture || lightboxExif.shutter_speed || lightboxExif.iso" class="grid grid-cols-2 gap-3">
                 <div v-if="lightboxExif.focal_length">
-                  <p class="text-xs text-gray-500 mb-1">焦距</p>
-                  <p class="text-white text-sm">{{ lightboxExif.focal_length }}</p>
+                  <p class="text-xs text-cf-muted mb-1">焦距</p>
+                  <p class="text-cf-text text-sm">{{ lightboxExif.focal_length }}</p>
                 </div>
                 <div v-if="lightboxExif.aperture">
-                  <p class="text-xs text-gray-500 mb-1">光圈</p>
-                  <p class="text-white text-sm">{{ lightboxExif.aperture }}</p>
+                  <p class="text-xs text-cf-muted mb-1">光圈</p>
+                  <p class="text-cf-text text-sm">{{ lightboxExif.aperture }}</p>
                 </div>
                 <div v-if="lightboxExif.shutter_speed">
-                  <p class="text-xs text-gray-500 mb-1">快门</p>
-                  <p class="text-white text-sm">{{ lightboxExif.shutter_speed }}</p>
+                  <p class="text-xs text-cf-muted mb-1">快门</p>
+                  <p class="text-cf-text text-sm">{{ lightboxExif.shutter_speed }}</p>
                 </div>
                 <div v-if="lightboxExif.iso">
-                  <p class="text-xs text-gray-500 mb-1">感光度</p>
-                  <p class="text-white text-sm">{{ lightboxExif.iso }}</p>
+                  <p class="text-xs text-cf-muted mb-1">感光度</p>
+                  <p class="text-cf-text text-sm">{{ lightboxExif.iso }}</p>
                 </div>
               </div>
 
               <!-- Dimensions -->
               <div v-if="lightboxExif.width && lightboxExif.height">
-                <p class="text-xs text-gray-500 mb-1">尺寸</p>
-                <p class="text-white text-sm">{{ lightboxExif.width }} x {{ lightboxExif.height }}</p>
+                <p class="text-xs text-cf-muted mb-1">尺寸</p>
+                <p class="text-cf-text text-sm">{{ lightboxExif.width }} x {{ lightboxExif.height }}</p>
               </div>
 
               <!-- Date -->
               <div v-if="lightboxExif.date_time">
-                <p class="text-xs text-gray-500 mb-1">拍摄时间</p>
-                <p class="text-white text-sm">{{ lightboxExif.date_time }}</p>
+                <p class="text-xs text-cf-muted mb-1">拍摄时间</p>
+                <p class="text-cf-text text-sm">{{ lightboxExif.date_time }}</p>
               </div>
 
               <!-- Other info -->
               <div v-if="lightboxExif.exposure_mode || lightboxExif.white_balance || lightboxExif.metering_mode || lightboxExif.flash" class="grid grid-cols-2 gap-3">
                 <div v-if="lightboxExif.exposure_mode">
-                  <p class="text-xs text-gray-500 mb-1">曝光模式</p>
-                  <p class="text-white text-sm">{{ lightboxExif.exposure_mode }}</p>
+                  <p class="text-xs text-cf-muted mb-1">曝光模式</p>
+                  <p class="text-cf-text text-sm">{{ lightboxExif.exposure_mode }}</p>
                 </div>
                 <div v-if="lightboxExif.white_balance">
-                  <p class="text-xs text-gray-500 mb-1">白平衡</p>
-                  <p class="text-white text-sm">{{ lightboxExif.white_balance }}</p>
+                  <p class="text-xs text-cf-muted mb-1">白平衡</p>
+                  <p class="text-cf-text text-sm">{{ lightboxExif.white_balance }}</p>
                 </div>
                 <div v-if="lightboxExif.metering_mode">
-                  <p class="text-xs text-gray-500 mb-1">测光模式</p>
-                  <p class="text-white text-sm">{{ lightboxExif.metering_mode }}</p>
+                  <p class="text-xs text-cf-muted mb-1">测光模式</p>
+                  <p class="text-cf-text text-sm">{{ lightboxExif.metering_mode }}</p>
                 </div>
                 <div v-if="lightboxExif.flash">
-                  <p class="text-xs text-gray-500 mb-1">闪光灯</p>
-                  <p class="text-white text-sm">{{ lightboxExif.flash }}</p>
+                  <p class="text-xs text-cf-muted mb-1">闪光灯</p>
+                  <p class="text-cf-text text-sm">{{ lightboxExif.flash }}</p>
                 </div>
               </div>
 
               <!-- GPS -->
               <div v-if="lightboxExif.gps_latitude && lightboxExif.gps_longitude">
-                <p class="text-xs text-gray-500 mb-1">GPS 位置</p>
-                <p class="text-white text-sm">{{ lightboxExif.gps_latitude }}, {{ lightboxExif.gps_longitude }}</p>
-              </div>
-
-              <!-- Software -->
-              <div v-if="lightboxExif.software">
-                <p class="text-xs text-gray-500 mb-1">软件</p>
-                <p class="text-white text-sm">{{ lightboxExif.software }}</p>
+                <p class="text-xs text-cf-muted mb-1">GPS 位置</p>
+                <p class="text-cf-text text-sm">{{ lightboxExif.gps_latitude }}, {{ lightboxExif.gps_longitude }}</p>
               </div>
 
               <!-- No EXIF -->
-              <div v-if="!lightboxExif.focal_length && !lightboxExif.date_time" class="text-gray-500 text-sm">
+              <div v-if="!lightboxExif.focal_length && !lightboxExif.date_time" class="text-cf-muted text-sm">
                 无可用的 EXIF 信息
               </div>
             </div>
@@ -772,55 +766,55 @@ function download() {
     </div>
 
     <!-- Download Modal -->
-    <div v-if="showDownloadModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+    <div v-if="showDownloadModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/30">
       <div class="card p-6 w-full max-w-sm" @click.stop>
-        <h3 class="text-lg font-semibold text-white mb-4">下载照片</h3>
+        <h3 class="text-lg font-semibold text-cf-text mb-4">下载照片</h3>
 
         <div class="space-y-3">
           <label
             class="flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-colors"
-            :class="downloadType === 'normal' ? 'bg-primary-500/20 border border-primary-500' : 'bg-dark-300 border border-dark-100'"
+            :class="downloadType === 'normal' ? 'bg-primary-50 border border-primary-500' : 'bg-gray-50 border border-cf-border'"
           >
             <input type="radio" v-model="downloadType" value="normal" class="hidden" />
             <div class="w-5 h-5 rounded-full border-2 flex items-center justify-center"
-              :class="downloadType === 'normal' ? 'border-primary-500' : 'border-gray-500'">
+              :class="downloadType === 'normal' ? 'border-primary-500' : 'border-gray-400'">
               <div v-if="downloadType === 'normal'" class="w-2.5 h-2.5 rounded-full bg-primary-500"></div>
             </div>
             <div>
-              <p class="font-medium text-white">普通照片</p>
-              <p class="text-sm text-gray-400">JPG 格式，适合网络分享</p>
+              <p class="font-medium text-cf-text">普通照片</p>
+              <p class="text-sm text-cf-muted">JPG 格式，适合网络分享</p>
             </div>
           </label>
 
           <label
             v-if="info?.allow_raw"
             class="flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-colors"
-            :class="downloadType === 'raw' ? 'bg-primary-500/20 border border-primary-500' : 'bg-dark-300 border border-dark-100'"
+            :class="downloadType === 'raw' ? 'bg-primary-50 border border-primary-500' : 'bg-gray-50 border border-cf-border'"
           >
             <input type="radio" v-model="downloadType" value="raw" class="hidden" />
             <div class="w-5 h-5 rounded-full border-2 flex items-center justify-center"
-              :class="downloadType === 'raw' ? 'border-primary-500' : 'border-gray-500'">
+              :class="downloadType === 'raw' ? 'border-primary-500' : 'border-gray-400'">
               <div v-if="downloadType === 'raw'" class="w-2.5 h-2.5 rounded-full bg-primary-500"></div>
             </div>
             <div>
-              <p class="font-medium text-white">仅 RAW 文件</p>
-              <p class="text-sm text-gray-400">原始画质 RAW 格式</p>
+              <p class="font-medium text-cf-text">仅 RAW 文件</p>
+              <p class="text-sm text-cf-muted">原始画质 RAW 格式</p>
             </div>
           </label>
 
           <label
             v-if="info?.allow_raw"
             class="flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-colors"
-            :class="downloadType === 'all' ? 'bg-primary-500/20 border border-primary-500' : 'bg-dark-300 border border-dark-100'"
+            :class="downloadType === 'all' ? 'bg-primary-50 border border-primary-500' : 'bg-gray-50 border border-cf-border'"
           >
             <input type="radio" v-model="downloadType" value="all" class="hidden" />
             <div class="w-5 h-5 rounded-full border-2 flex items-center justify-center"
-              :class="downloadType === 'all' ? 'border-primary-500' : 'border-gray-500'">
+              :class="downloadType === 'all' ? 'border-primary-500' : 'border-gray-400'">
               <div v-if="downloadType === 'all'" class="w-2.5 h-2.5 rounded-full bg-primary-500"></div>
             </div>
             <div>
-              <p class="font-medium text-white">全部文件</p>
-              <p class="text-sm text-gray-400">普通照片 + RAW 文件</p>
+              <p class="font-medium text-cf-text">全部文件</p>
+              <p class="text-sm text-cf-muted">普通照片 + RAW 文件</p>
             </div>
           </label>
         </div>

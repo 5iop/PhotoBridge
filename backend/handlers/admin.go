@@ -196,6 +196,14 @@ func DeleteProject(c *gin.Context) {
 		return
 	}
 
+	// 检查项目中是否还有照片
+	var photoCount int64
+	database.DB.Model(&models.Photo{}).Where("project_id = ?", id).Count(&photoCount)
+	if photoCount > 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "请先删除项目中的所有照片"})
+		return
+	}
+
 	// 获取所有关联的分享链接，以便删除其排除规则
 	var linkIDs []uint
 	database.DB.Model(&models.ShareLink{}).Where("project_id = ?", id).Pluck("id", &linkIDs)
@@ -203,16 +211,14 @@ func DeleteProject(c *gin.Context) {
 		database.DB.Where("link_id IN ?", linkIDs).Delete(&models.PhotoExclusion{})
 	}
 
-	// Delete associated photos and links
-	database.DB.Where("project_id = ?", id).Delete(&models.Photo{})
+	// Delete associated links
 	database.DB.Where("project_id = ?", id).Delete(&models.ShareLink{})
 	database.DB.Delete(&project)
 
-	// 删除项目的物理文件目录
+	// 删除项目的物理文件目录（如果存在）
 	uploadDir := filepath.Join(config.AppConfig.UploadDir, project.Name)
 	if err := os.RemoveAll(uploadDir); err != nil {
 		// 日志记录但不影响响应，因为数据库已清理
-		// 可以考虑在生产环境中添加日志
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Project deleted"})

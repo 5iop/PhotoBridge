@@ -137,14 +137,45 @@ Environment variables:
 | GET | `/api/share/:token/photo/:id/download` | Download single |
 | GET | `/api/share/:token/download` | Download all as ZIP |
 
-### API Upload (API Key Required)
+### API (API Key Required)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/projects` | List all projects |
+| POST | `/api/projects` | Create project |
+| DELETE | `/api/projects/:name` | Delete project (must be empty) |
+| GET | `/api/projects/:name/photos` | List photos with hash info |
+| POST | `/api/upload/:project` | Upload photos |
+
+**Examples:**
 
 ```bash
+# List projects
+curl "http://localhost:8060/api/projects" \
+  -H "X-API-Key: your-api-key"
+
+# Create project
+curl -X POST "http://localhost:8060/api/projects" \
+  -H "X-API-Key: your-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Wedding 2024", "description": "婚礼摄影"}'
+
+# Delete project
+curl -X DELETE "http://localhost:8060/api/projects/Wedding%202024" \
+  -H "X-API-Key: your-api-key"
+
+# Get project photos
+curl "http://localhost:8060/api/projects/Wedding%202024/photos" \
+  -H "X-API-Key: your-api-key"
+
+# Upload photos
 curl -X POST "http://localhost:8060/api/upload/ProjectName" \
   -H "X-API-Key: your-api-key" \
   -F "files=@photo1.jpg" \
   -F "files=@photo1.arw"
 ```
+
+**API Documentation:** Access Swagger UI at `http://localhost:8060/api/docs`
 
 ## Project Structure
 

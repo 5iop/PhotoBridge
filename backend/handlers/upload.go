@@ -210,6 +210,201 @@ func GetProjectPhotos(c *gin.Context) {
 	c.JSON(http.StatusOK, photos)
 }
 
+// API Key authenticated handlers
+
+// GetProjectsViaAPI returns all projects (API Key auth)
+func GetProjectsViaAPI(c *gin.Context) {
+	var projects []models.Project
+	result := database.DB.Find(&projects)
+	if result.Error != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch projects"})
+		return
+	}
+
+	// Build response with photo count
+	type ProjectInfo struct {
+		ID          uint   `json:"id"`
+		Name        string `json:"name"`
+		Description string `json:"description"`
+		CoverPhoto  string `json:"cover_photo"`
+		PhotoCount  int64  `json:"photo_count"`
+		CreatedAt   string `json:"created_at"`
+	}
+
+	var response []ProjectInfo
+	for _, p := range projects {
+		var count int64
+		database.DB.Model(&models.Photo{}).Where("project_id = ?", p.ID).Count(&count)
+		response = append(response, ProjectInfo{
+			ID:          p.ID,
+			Name:        p.Name,
+			Description: p.Description,
+			CoverPhoto:  p.CoverPhoto,
+			PhotoCount:  count,
+			CreatedAt:   p.CreatedAt.Format("2006-01-02T15:04:05Z"),
+		})
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"projects": response,
+		"total":    len(response),
+	})
+}
+
+// GetProjectPhotosViaAPI returns all photos in a project (API Key auth)
+func GetProjectPhotosViaAPI(c *gin.Context) {
+	projectName := c.Param("project")
+
+	// Sanitize project name
+	sanitizedName, valid := utils.SanitizeProjectName(projectName)
+	if !valid {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid project name"})
+		return
+	}
+
+	// Find project
+	var project models.Project
+	if err := database.DB.Where("name = ?", sanitizedName).First(&project).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Project not found"})
+		return
+	}
+
+	// Get photos
+	var photos []models.Photo
+	database.DB.Where("project_id = ?", project.ID).Find(&photos)
+
+	// Build response
+	type PhotoInfo struct {
+		ID        uint   `json:"id"`
+		BaseName  string `json:"base_name"`
+		NormalExt string `json:"normal_ext,omitempty"`
+		RawExt    string `json:"raw_ext,omitempty"`
+		HasRaw    bool   `json:"has_raw"`
+		FileHash  string `json:"file_hash,omitempty"`
+		CreatedAt string `json:"created_at"`
+	}
+
+	var response []PhotoInfo
+	for _, p := range photos {
+		response = append(response, PhotoInfo{
+			ID:        p.ID,
+			BaseName:  p.BaseName,
+			NormalExt: p.NormalExt,
+			RawExt:    p.RawExt,
+			HasRaw:    p.HasRaw,
+			FileHash:  p.FileHash,
+			CreatedAt: p.CreatedAt.Format("2006-01-02T15:04:05Z"),
+		})
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"project": gin.H{
+			"id":          project.ID,
+			"name":        project.Name,
+			"description": project.Description,
+		},
+		"photos": response,
+		"total":  len(response),
+	})
+}
+
+// CreateProjectViaAPI creates a new project (API Key auth)
+func CreateProjectViaAPI(c *gin.Context) {
+	var req struct {
+		Name        string `json:"name" binding:"required"`
+		Description string `json:"description"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Project name is required"})
+		return
+	}
+
+	// Sanitize project name
+	sanitizedName, valid := utils.SanitizeProjectName(req.Name)
+	if !valid {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid project name"})
+		return
+	}
+
+	// Check if project already exists
+	var existing models.Project
+	if err := database.DB.Where("name = ?", sanitizedName).First(&existing).Error; err == nil {
+		c.JSON(http.StatusConflict, gin.H{"error": "Project already exists", "project": existing})
+		return
+	}
+
+	// Create project
+	project := models.Project{
+		Name:        sanitizedName,
+		Description: req.Description,
+	}
+	if err := database.DB.Create(&project).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create project"})
+		return
+	}
+
+	c.JSON(http.StatusCreated, gin.H{
+		"message": fmt.Sprintf("Project '%s' created successfully", project.Name),
+		"project": gin.H{
+			"id":          project.ID,
+			"name":        project.Name,
+			"description": project.Description,
+			"created_at":  project.CreatedAt.Format("2006-01-02T15:04:05Z"),
+		},
+	})
+}
+
+// DeleteProjectViaAPI deletes a project (API Key auth)
+func DeleteProjectViaAPI(c *gin.Context) {
+	projectName := c.Param("project")
+
+	// Sanitize project name
+	sanitizedName, valid := utils.SanitizeProjectName(projectName)
+	if !valid {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid project name"})
+		return
+	}
+
+	// Find project
+	var project models.Project
+	if err := database.DB.Where("name = ?", sanitizedName).First(&project).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Project not found"})
+		return
+	}
+
+	// Check if project has photos
+	var photoCount int64
+	database.DB.Model(&models.Photo{}).Where("project_id = ?", project.ID).Count(&photoCount)
+	if photoCount > 0 {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":       "Project has photos, delete all photos first",
+			"photo_count": photoCount,
+		})
+		return
+	}
+
+	// Get share link IDs for deletion
+	var linkIDs []uint
+	database.DB.Model(&models.ShareLink{}).Where("project_id = ?", project.ID).Pluck("id", &linkIDs)
+	if len(linkIDs) > 0 {
+		database.DB.Where("link_id IN ?", linkIDs).Delete(&models.PhotoExclusion{})
+	}
+
+	// Delete share links
+	database.DB.Where("project_id = ?", project.ID).Delete(&models.ShareLink{})
+
+	// Delete project
+	database.DB.Delete(&project)
+
+	// Delete upload directory
+	uploadDir := filepath.Join(config.AppConfig.UploadDir, project.Name)
+	os.RemoveAll(uploadDir)
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": fmt.Sprintf("Project '%s' deleted successfully", project.Name),
+	})
+}
+
 // CheckHashes checks which file hashes already exist in a project
 // POST body: { "hashes": ["hash1", "hash2", ...] }
 // Response: { "existing": ["hash1", ...], "new": ["hash2", ...] }

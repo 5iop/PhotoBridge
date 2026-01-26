@@ -1,0 +1,434 @@
+openapi: 3.0.3
+info:
+  title: PhotoBridge API
+  description: |
+    PhotoBridge 提供 API 接口，允许通过 API Key 进行照片管理和上传。
+
+    ## 认证方式
+
+    所有 API 请求需要通过以下方式之一提供 API Key：
+
+    - **HTTP Header**（推荐）: `X-API-Key: your-api-key`
+    - **Query 参数**: `?api_key=your-api-key`
+  version: 1.0.0
+  contact:
+    name: PhotoBridge
+
+servers:
+  - url: /api
+    description: API Server
+
+tags:
+  - name: Projects
+    description: 项目管理
+  - name: Photos
+    description: 照片管理
+  - name: Upload
+    description: 文件上传
+
+security:
+  - ApiKeyHeader: []
+  - ApiKeyQuery: []
+
+paths:
+  /projects:
+    get:
+      tags:
+        - Projects
+      summary: 获取项目列表
+      description: 获取所有项目的列表，包含每个项目的照片数量
+      operationId: getProjects
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  projects:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ProjectInfo'
+                  total:
+                    type: integer
+                    description: 项目总数
+              example:
+                projects:
+                  - id: 1
+                    name: "Wedding 2024"
+                    description: "婚礼摄影"
+                    cover_photo: "IMG_001.jpg"
+                    photo_count: 150
+                    created_at: "2024-01-15T10:30:00Z"
+                total: 1
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    post:
+      tags:
+        - Projects
+      summary: 创建项目
+      description: 创建一个新项目
+      operationId: createProject
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+              properties:
+                name:
+                  type: string
+                  description: 项目名称
+                description:
+                  type: string
+                  description: 项目描述（可选）
+            example:
+              name: "Wedding 2024"
+              description: "婚礼摄影"
+      responses:
+        '201':
+          description: 创建成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  project:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                      name:
+                        type: string
+                      description:
+                        type: string
+                      created_at:
+                        type: string
+                        format: date-time
+              example:
+                message: "Project 'Wedding 2024' created successfully"
+                project:
+                  id: 1
+                  name: "Wedding 2024"
+                  description: "婚礼摄影"
+                  created_at: "2024-01-15T10:30:00Z"
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          description: 项目已存在
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                  project:
+                    $ref: '#/components/schemas/Project'
+              example:
+                error: "Project already exists"
+                project:
+                  id: 1
+                  name: "Wedding 2024"
+
+  /projects/{project}:
+    delete:
+      tags:
+        - Projects
+      summary: 删除项目
+      description: |
+        删除指定的项目。
+
+        **注意**：项目必须为空（没有照片）才能删除。
+      operationId: deleteProject
+      parameters:
+        - name: project
+          in: path
+          required: true
+          description: 项目名称
+          schema:
+            type: string
+          example: "Wedding 2024"
+      responses:
+        '200':
+          description: 删除成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+              example:
+                message: "Project 'Wedding 2024' deleted successfully"
+        '400':
+          description: 项目不为空
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                  photo_count:
+                    type: integer
+              example:
+                error: "Project has photos, delete all photos first"
+                photo_count: 50
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /projects/{project}/photos:
+    get:
+      tags:
+        - Photos
+      summary: 获取项目照片
+      description: 获取指定项目中所有照片的详细信息，包括文件哈希值
+      operationId: getProjectPhotos
+      parameters:
+        - name: project
+          in: path
+          required: true
+          description: 项目名称
+          schema:
+            type: string
+          example: "Wedding 2024"
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  project:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                      name:
+                        type: string
+                      description:
+                        type: string
+                  photos:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PhotoInfo'
+                  total:
+                    type: integer
+              example:
+                project:
+                  id: 1
+                  name: "Wedding 2024"
+                  description: "婚礼摄影"
+                photos:
+                  - id: 1
+                    base_name: "IMG_001"
+                    normal_ext: ".jpg"
+                    raw_ext: ".arw"
+                    has_raw: true
+                    file_hash: "a1b2c3d4e5f6..."
+                    created_at: "2024-01-15T10:35:00Z"
+                total: 1
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /upload/{project}:
+    post:
+      tags:
+        - Upload
+      summary: 上传照片
+      description: |
+        上传照片到指定项目。如果项目不存在，将自动创建。
+
+        支持的文件格式：
+        - **普通图片**: .jpg, .jpeg, .png
+        - **RAW 格式**: .arw, .cr2, .cr3, .nef, .dng, .orf, .rw2, .pef, .raf
+
+        同一张照片的普通图片和 RAW 文件使用相同的文件名（不含扩展名），系统会自动关联。
+      operationId: uploadPhotos
+      parameters:
+        - name: project
+          in: path
+          required: true
+          description: 项目名称，支持中文、英文、数字、下划线、连字符和空格
+          schema:
+            type: string
+          example: "Wedding 2024"
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - files
+              properties:
+                files:
+                  type: array
+                  items:
+                    type: string
+                    format: binary
+                  description: 图片文件（可多选）
+      responses:
+        '200':
+          description: 上传成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  project:
+                    $ref: '#/components/schemas/Project'
+                  failed:
+                    type: array
+                    items:
+                      type: string
+                    description: 上传失败的文件列表
+              example:
+                message: "Uploaded 3 files to project 'Wedding 2024'"
+                project:
+                  id: 1
+                  name: "Wedding 2024"
+                  description: ""
+                  cover_photo: "IMG_001.jpg"
+                  created_at: "2024-01-15T10:30:00Z"
+                failed: []
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+components:
+  securitySchemes:
+    ApiKeyHeader:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: API Key 通过 HTTP Header 传递
+    ApiKeyQuery:
+      type: apiKey
+      in: query
+      name: api_key
+      description: API Key 通过 Query 参数传递
+
+  schemas:
+    Project:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: 项目 ID
+        name:
+          type: string
+          description: 项目名称
+        description:
+          type: string
+          description: 项目描述
+        cover_photo:
+          type: string
+          description: 封面照片文件名
+        created_at:
+          type: string
+          format: date-time
+          description: 创建时间
+
+    ProjectInfo:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: 项目 ID
+        name:
+          type: string
+          description: 项目名称
+        description:
+          type: string
+          description: 项目描述
+        cover_photo:
+          type: string
+          description: 封面照片文件名
+        photo_count:
+          type: integer
+          description: 照片数量
+        created_at:
+          type: string
+          format: date-time
+          description: 创建时间
+
+    PhotoInfo:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: 照片 ID
+        base_name:
+          type: string
+          description: 文件基础名称（不含扩展名）
+        normal_ext:
+          type: string
+          description: 普通图片扩展名（如 .jpg）
+        raw_ext:
+          type: string
+          description: RAW 文件扩展名（如 .arw）
+        has_raw:
+          type: boolean
+          description: 是否包含 RAW 文件
+        file_hash:
+          type: string
+          description: 文件的 SHA-256 哈希值
+        created_at:
+          type: string
+          format: date-time
+          description: 创建时间
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          description: 错误信息
+
+  responses:
+    BadRequest:
+      description: 请求参数错误
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: "Invalid project name"
+
+    Unauthorized:
+      description: 未授权（API Key 缺失或无效）
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: "API key required"
+
+    NotFound:
+      description: 资源不存在
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: "Project not found"

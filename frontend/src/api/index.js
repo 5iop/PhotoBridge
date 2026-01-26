@@ -62,7 +62,16 @@ export const getPhotoExif = (token, photoId) => api.get(`/share/${token}/photo/$
 export const getAdminPhotoExif = (photoId) => api.get(`/admin/photos/${photoId}/exif`)
 export const getAdminPhotoFiles = (photoId) => api.get(`/admin/photos/${photoId}/files`)
 
-export const getUploadUrl = () => import.meta.env.VITE_API_URL || ''
+export const getUploadUrl = () => {
+  if (import.meta.env.VITE_API_URL) {
+    return import.meta.env.VITE_API_URL
+  }
+  // 开发模式下默认使用后端地址
+  if (import.meta.env.DEV) {
+    return 'http://localhost:8060'
+  }
+  return ''
+}
 
 // Thumbnail URLs (share routes don't need auth)
 export const getShareThumbSmallUrl = (token, photoId) => `${getUploadUrl()}/api/share/${token}/photo/${photoId}/thumb/small`

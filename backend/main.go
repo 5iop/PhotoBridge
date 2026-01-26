@@ -45,6 +45,14 @@ func main() {
 			c.JSON(http.StatusOK, gin.H{"status": "ok"})
 		})
 
+		// Swagger UI and OpenAPI spec
+		api.GET("/docs", func(c *gin.Context) {
+			c.File("./docs/swagger.html")
+		})
+		api.GET("/docs/openapi.yaml", func(c *gin.Context) {
+			c.File("./docs/openapi.yaml")
+		})
+
 		// Public auth
 		api.POST("/admin/login", handlers.Login)
 
@@ -76,11 +84,17 @@ func main() {
 			admin.DELETE("/links/:id", handlers.DeleteShareLink)
 		}
 
-		// API upload (require API Key)
-		upload := api.Group("/upload")
-		upload.Use(middleware.APIKeyAuth())
+		// API routes (require API Key)
+		apiKey := api.Group("")
+		apiKey.Use(middleware.APIKeyAuth())
 		{
-			upload.POST("/:project", handlers.UploadViaAPI)
+			// Upload
+			apiKey.POST("/upload/:project", handlers.UploadViaAPI)
+			// Projects
+			apiKey.GET("/projects", handlers.GetProjectsViaAPI)
+			apiKey.POST("/projects", handlers.CreateProjectViaAPI)
+			apiKey.DELETE("/projects/:project", handlers.DeleteProjectViaAPI)
+			apiKey.GET("/projects/:project/photos", handlers.GetProjectPhotosViaAPI)
 		}
 
 		// Share routes (public)

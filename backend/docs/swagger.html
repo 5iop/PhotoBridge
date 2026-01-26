@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PhotoBridge API 文档</title>
+  <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5.11.0/swagger-ui.css">
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+    }
+    .swagger-ui .topbar {
+      display: none;
+    }
+    .swagger-ui .info {
+      margin: 30px 0;
+    }
+    .swagger-ui .info .title {
+      color: #f6821f;
+    }
+    .swagger-ui .opblock.opblock-get .opblock-summary-method {
+      background: #3b82f6;
+    }
+    .swagger-ui .opblock.opblock-post .opblock-summary-method {
+      background: #22c55e;
+    }
+    .swagger-ui .btn.authorize {
+      border-color: #f6821f;
+      color: #f6821f;
+    }
+    .swagger-ui .btn.authorize svg {
+      fill: #f6821f;
+    }
+    .custom-header {
+      background: #fff;
+      border-bottom: 1px solid #e5e7eb;
+      padding: 16px 24px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .custom-header svg {
+      width: 32px;
+      height: 32px;
+    }
+    .custom-header h1 {
+      margin: 0;
+      font-size: 20px;
+      font-weight: 600;
+      color: #1f2937;
+    }
+    .custom-header a {
+      margin-left: auto;
+      color: #6b7280;
+      text-decoration: none;
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .custom-header a:hover {
+      color: #f6821f;
+    }
+  </style>
+</head>
+<body>
+  <div class="custom-header">
+    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="12" cy="12" r="4" stroke="#f6821f" stroke-width="1.5"/>
+      <path d="M22 12C22 16.714 22 19.0711 20.5355 20.5355C19.0711 22 16.714 22 12 22C7.28595 22 4.92893 22 3.46447 20.5355C2 19.0711 2 16.714 2 12C2 7.28595 2 4.92893 3.46447 3.46447C4.92893 2 7.28595 2 12 2C16.714 2 19.0711 2 20.5355 3.46447C21.5093 4.43821 21.8356 5.80655 21.9449 8" stroke="#f6821f" stroke-width="1.5" stroke-linecap="round"/>
+    </svg>
+    <h1>PhotoBridge API</h1>
+    <a href="/admin">
+      <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+      </svg>
+      返回管理后台
+    </a>
+  </div>
+  <div id="swagger-ui"></div>
+  <script src="https://unpkg.com/swagger-ui-dist@5.11.0/swagger-ui-bundle.js"></script>
+  <script>
+    window.onload = function() {
+      SwaggerUIBundle({
+        url: "/api/docs/openapi.yaml",
+        dom_id: '#swagger-ui',
+        presets: [
+          SwaggerUIBundle.presets.apis,
+          SwaggerUIBundle.SwaggerUIStandalonePreset
+        ],
+        layout: "BaseLayout",
+        deepLinking: true,
+        showExtensions: true,
+        showCommonExtensions: true,
+        defaultModelsExpandDepth: 1,
+        defaultModelExpandDepth: 1,
+        docExpansion: "list",
+        filter: true,
+        tryItOutEnabled: true
+      });
+    };
+  </script>
+</body>
+</html>

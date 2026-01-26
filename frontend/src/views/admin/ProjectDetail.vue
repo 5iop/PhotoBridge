@@ -373,10 +373,25 @@ async function deleteSelected() {
 }
 
 async function setCover(photo) {
+  if (!photo.normal_ext) {
+    alert('只有RAW的照片无法设为封面')
+    return
+  }
   await api.updateProject(projectId.value, {
     cover_photo: photo.base_name + photo.normal_ext
   })
   project.value.cover_photo = photo.base_name + photo.normal_ext
+}
+
+async function setCoverFromSelected() {
+  if (selectedPhotos.value.size !== 1) return
+  const photoId = Array.from(selectedPhotos.value)[0]
+  const photo = photos.value.find(p => p.id === photoId)
+  if (photo) {
+    await setCover(photo)
+    selectedPhotos.value.clear()
+    selectedPhotos.value = new Set(selectedPhotos.value)
+  }
 }
 
 // Preview with EXIF and files
@@ -570,9 +585,17 @@ function toggleExclusion(photoId) {
               </button>
               <span v-if="selectedPhotos.size" class="text-sm text-cf-muted">已选择 {{ selectedPhotos.size }} 张</span>
             </div>
-            <button v-if="selectedPhotos.size" @click="deleteSelected" class="btn btn-danger text-sm py-1.5">
-              删除
-            </button>
+            <div v-if="selectedPhotos.size" class="flex items-center gap-2">
+              <button v-if="selectedPhotos.size === 1" @click="setCoverFromSelected" class="btn btn-secondary text-sm py-1.5">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                设为封面
+              </button>
+              <button @click="deleteSelected" class="btn btn-danger text-sm py-1.5">
+                删除
+              </button>
+            </div>
           </div>
 
           <!-- Loading -->
@@ -590,7 +613,7 @@ function toggleExclusion(photoId) {
               :key="photo.id"
               class="group relative aspect-square rounded-lg overflow-hidden bg-gray-100 cursor-pointer"
               :class="selectedPhotos.has(photo.id) ? 'ring-2 ring-primary-500' : ''"
-              @click="toggleSelect(photo.id)"
+              @click="openPreview(photo)"
             >
               <!-- 有缩略图URL时显示图片 -->
               <img v-if="photo.normal_ext && getThumbSmallUrl(photo)" :src="getThumbSmallUrl(photo)" class="w-full h-full object-cover" loading="lazy" @error="handleThumbError($event, photo)" />
@@ -609,27 +632,22 @@ function toggleExclusion(photoId) {
                 <span class="text-[10px]">只有RAW</span>
               </div>
 
-              <div class="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                <button @click.stop="openPreview(photo)" class="p-1.5 rounded bg-white/20 hover:bg-white/30 text-white" title="预览">
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                  </svg>
-                </button>
-                <button @click.stop="setCover(photo)" class="p-1.5 rounded bg-white/20 hover:bg-white/30 text-white" title="设为封面">
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                  </svg>
-                </button>
-              </div>
-
-              <div class="absolute top-1.5 left-1.5 w-5 h-5 rounded-full border-2 flex items-center justify-center" :class="selectedPhotos.has(photo.id) ? 'bg-primary-500 border-primary-500' : 'border-white/50 bg-black/30'">
+              <!-- Checkbox for selection -->
+              <div
+                class="absolute top-1.5 left-1.5 w-5 h-5 rounded-full border-2 flex items-center justify-center cursor-pointer z-10 transition-colors"
+                :class="selectedPhotos.has(photo.id) ? 'bg-primary-500 border-primary-500' : 'border-white/70 bg-black/40 hover:bg-black/60'"
+                @click.stop="toggleSelect(photo.id)"
+              >
                 <svg v-if="selectedPhotos.has(photo.id)" class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" />
                 </svg>
               </div>
 
+              <!-- RAW badge -->
               <div v-if="photo.has_raw" class="absolute top-1.5 right-1.5 px-1.5 py-0.5 rounded bg-primary-500/80 text-white text-[10px] font-medium">RAW</div>
+
+              <!-- Cover badge -->
+              <div v-if="project?.cover_photo === photo.base_name + photo.normal_ext" class="absolute bottom-1.5 left-1.5 px-1.5 py-0.5 rounded bg-green-500/80 text-white text-[10px] font-medium">封面</div>
             </div>
           </div>
 
