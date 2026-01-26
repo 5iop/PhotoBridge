@@ -1,6 +1,42 @@
 version: '3.8'
 
 services:
+  traefik:
+    image: traefik:v2.11
+    container_name: traefik
+    restart: unless-stopped
+    command:
+      - "--api.dashboard=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--certificatesresolvers.letsencrypt.acme.dnschallenge=true"
+      - "--certificatesresolvers.letsencrypt.acme.dnschallenge.provider=cloudflare"
+      - "--certificatesresolvers.letsencrypt.acme.email=admin@jangit.me"
+      - "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      - CF_API_EMAIL=${CF_API_EMAIL:-}
+      - CF_DNS_API_TOKEN=${CF_DNS_API_TOKEN}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - traefik_letsencrypt:/letsencrypt
+    labels:
+      - "traefik.enable=true"
+      # Dashboard
+      - "traefik.http.routers.traefik.rule=Host(`traefik.jangit.me`)"
+      - "traefik.http.routers.traefik.entrypoints=websecure"
+      - "traefik.http.routers.traefik.tls=true"
+      - "traefik.http.routers.traefik.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.traefik.service=api@internal"
+      - "traefik.http.routers.traefik.middlewares=traefik-auth"
+      - "traefik.http.middlewares.traefik-auth.basicauth.users=admin:$$apr1$$8EVjn/nj$$GiLUZqcbueTFeD23SuB6x0"
+    networks:
+      - traefik
+
   photobridge:
     image: ghcr.io/5iop/photobridge:latest
     container_name: photobridge
@@ -13,8 +49,8 @@ services:
       - PORT=80
       - GIN_MODE=release
     volumes:
-      - photobridge_data:/app/data
-      - photobridge_uploads:/app/uploads
+      - ./photobridge/data:/app/data
+      - ./uploads:/app/uploads
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80/api/health"]
       interval: 30s
@@ -23,13 +59,13 @@ services:
       start_period: 5s
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.photobridge.rule=Host(`${PHOTOBRIDGE_DOMAIN:-photobridge.localhost}`)"
+      - "traefik.http.routers.photobridge.rule=Host(`pb.jangit.me`)"
       - "traefik.http.routers.photobridge.entrypoints=websecure"
       - "traefik.http.routers.photobridge.tls=true"
       - "traefik.http.routers.photobridge.tls.certresolver=letsencrypt"
       - "traefik.http.services.photobridge.loadbalancer.server.port=80"
       # HTTP redirect to HTTPS
-      - "traefik.http.routers.photobridge-http.rule=Host(`${PHOTOBRIDGE_DOMAIN:-photobridge.localhost}`)"
+      - "traefik.http.routers.photobridge-http.rule=Host(`pb.jangit.me`)"
       - "traefik.http.routers.photobridge-http.entrypoints=web"
       - "traefik.http.routers.photobridge-http.middlewares=redirect-to-https"
       - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
@@ -38,9 +74,8 @@ services:
       - traefik
 
 volumes:
-  photobridge_data:
-  photobridge_uploads:
+  traefik_letsencrypt:
 
 networks:
   traefik:
-    external: true
+    driver: bridge

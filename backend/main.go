@@ -15,7 +15,11 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+const shortname = "[PhotoBridge]"
+
 func main() {
+	log.Printf("%s Starting PhotoBridge", shortname)
+
 	// Load configuration
 	config.Load()
 
@@ -124,8 +128,9 @@ func main() {
 	}
 
 	// Start server
-	log.Printf("Server starting on port %s", config.AppConfig.Port)
+	log.Printf("%s Server starting on port %s", shortname, config.AppConfig.Port)
+	log.Printf("%s Access the application at http://localhost:%s", shortname, config.AppConfig.Port)
 	if err := r.Run(":" + config.AppConfig.Port); err != nil {
-		log.Fatalf("Failed to start server: %v", err)
+		log.Fatalf("%s Failed to start server: %v", shortname, err)
 	}
 }

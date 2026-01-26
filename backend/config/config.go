@@ -1,6 +1,7 @@
 package config
 
 import (
+	"log"
 	"os"
 )
 
@@ -16,7 +17,10 @@ type Config struct {
 
 var AppConfig *Config
 
+const shortname = "[Config]"
+
 func Load() {
+	log.Printf("%s Loading configuration", shortname)
 	AppConfig = &Config{
 		AdminUsername: getEnv("ADMIN_USERNAME", "admin"),
 		AdminPassword: getEnv("ADMIN_PASSWORD", "admin123"),
@@ -26,6 +30,15 @@ func Load() {
 		UploadDir:     getEnv("UPLOAD_DIR", "./uploads"),
 		DatabasePath:  getEnv("DATABASE_PATH", "./data/photobridge.db"),
 	}
+	log.Printf("%s Configuration loaded - Port: %s, UploadDir: %s, DatabasePath: %s",
+		shortname, AppConfig.Port, AppConfig.UploadDir, AppConfig.DatabasePath)
+
+	// Ensure upload directory exists
+	log.Printf("%s Creating upload directory: %s", shortname, AppConfig.UploadDir)
+	if err := os.MkdirAll(AppConfig.UploadDir, 0755); err != nil {
+		log.Fatalf("%s Failed to create upload directory %s: %v", shortname, AppConfig.UploadDir, err)
+	}
+	log.Printf("%s Upload directory created/verified: %s", shortname, AppConfig.UploadDir)
 }
 
 func getEnv(key, defaultValue string) string {
