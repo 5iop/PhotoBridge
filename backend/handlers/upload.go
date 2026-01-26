@@ -31,10 +31,19 @@ func processUploadedFile(c *gin.Context, file *multipart.FileHeader, project *mo
 	}
 
 	// Check if file with same hash already exists in this project
+	// Check appropriate hash field based on file type
 	var existingByHash models.Photo
-	if err := database.DB.Where("project_id = ? AND file_hash = ?", project.ID, fileHash).First(&existingByHash).Error; err == nil {
-		// File already exists, return existing photo without saving again
-		return &existingByHash, nil
+	isRaw := models.IsRawExtension(ext)
+	if isRaw {
+		// Check raw_hash field for RAW files
+		if err := database.DB.Where("project_id = ? AND raw_hash = ?", project.ID, fileHash).First(&existingByHash).Error; err == nil {
+			return &existingByHash, nil
+		}
+	} else {
+		// Check normal_hash and file_hash (backward compatibility) for normal images
+		if err := database.DB.Where("project_id = ? AND (normal_hash = ? OR file_hash = ?)", project.ID, fileHash, fileHash).First(&existingByHash).Error; err == nil {
+			return &existingByHash, nil
+		}
 	}
 
 	// Save file with lowercase extension for consistency
@@ -53,9 +62,11 @@ func processUploadedFile(c *gin.Context, file *multipart.FileHeader, project *mo
 		if models.IsRawExtension(ext) {
 			existingPhoto.RawExt = ext
 			existingPhoto.HasRaw = true
+			existingPhoto.RawHash = fileHash
 		} else if models.IsImageExtension(ext) {
 			existingPhoto.NormalExt = ext
-			existingPhoto.FileHash = fileHash
+			existingPhoto.NormalHash = fileHash
+			existingPhoto.FileHash = fileHash // Keep for backward compatibility
 			// 清除旧缩略图，浏览时会按需重新生成
 			existingPhoto.ThumbSmall = nil
 			existingPhoto.ThumbLarge = nil
@@ -70,13 +81,15 @@ func processUploadedFile(c *gin.Context, file *multipart.FileHeader, project *mo
 	photo := models.Photo{
 		ProjectID: project.ID,
 		BaseName:  baseName,
-		FileHash:  fileHash,
+		FileHash:  fileHash, // Keep for backward compatibility
 	}
 	if models.IsRawExtension(ext) {
 		photo.RawExt = ext
 		photo.HasRaw = true
+		photo.RawHash = fileHash
 	} else if models.IsImageExtension(ext) {
 		photo.NormalExt = ext
+		photo.NormalHash = fileHash
 	}
 	database.DB.Create(&photo)
 
@@ -430,12 +443,19 @@ func CheckHashes(c *gin.Context) {
 		return
 	}
 
-	// Query existing hashes
+	// Query existing hashes - check normal_hash, raw_hash, and file_hash (backward compatibility)
 	var existingPhotos []models.Photo
-	database.DB.Where("project_id = ? AND file_hash IN ?", project.ID, req.Hashes).Find(&existingPhotos)
+	database.DB.Where("project_id = ? AND (normal_hash IN ? OR raw_hash IN ? OR file_hash IN ?)",
+		project.ID, req.Hashes, req.Hashes, req.Hashes).Find(&existingPhotos)
 
 	existingSet := make(map[string]bool)
 	for _, photo := range existingPhotos {
+		if photo.NormalHash != "" {
+			existingSet[photo.NormalHash] = true
+		}
+		if photo.RawHash != "" {
+			existingSet[photo.RawHash] = true
+		}
 		if photo.FileHash != "" {
 			existingSet[photo.FileHash] = true
 		}

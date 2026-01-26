@@ -46,6 +46,33 @@ func Init() {
 	}
 	log.Printf("%s Database connection established", shortname)
 
+	// Get underlying SQL DB for configuration
+	sqlDB, err := DB.DB()
+	if err != nil {
+		log.Fatalf("%s Failed to get database instance: %v", shortname, err)
+	}
+
+	// Enable WAL mode for better concurrency
+	log.Printf("%s Enabling WAL mode", shortname)
+	if _, err := sqlDB.Exec("PRAGMA journal_mode=WAL;"); err != nil {
+		log.Printf("%s Warning: Failed to enable WAL mode: %v", shortname, err)
+	}
+
+	// Set synchronous mode to NORMAL for better performance
+	if _, err := sqlDB.Exec("PRAGMA synchronous=NORMAL;"); err != nil {
+		log.Printf("%s Warning: Failed to set synchronous mode: %v", shortname, err)
+	}
+
+	// Increase cache size to 20MB (default is 2MB)
+	if _, err := sqlDB.Exec("PRAGMA cache_size=-20000;"); err != nil {
+		log.Printf("%s Warning: Failed to set cache size: %v", shortname, err)
+	}
+
+	// Set connection pool settings
+	sqlDB.SetMaxOpenConns(1) // SQLite only supports 1 writer at a time
+	sqlDB.SetMaxIdleConns(1)
+	log.Printf("%s Database optimization settings applied", shortname)
+
 	// Auto migrate models
 	log.Printf("%s Running database migrations", shortname)
 	err = DB.AutoMigrate(

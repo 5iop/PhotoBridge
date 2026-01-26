@@ -123,18 +123,18 @@ func GetSharePhoto(c *gin.Context) {
 	}
 
 	var link models.ShareLink
-	result := database.DB.Where("token = ?", token).Preload("Exclusions").First(&link)
+	result := database.DB.Where("token = ?", token).First(&link)
 	if result.Error != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Share link not found"})
 		return
 	}
 
-	// Check if photo is excluded
-	for _, e := range link.Exclusions {
-		if e.PhotoID == uint(photoIDUint) {
-			c.JSON(http.StatusForbidden, gin.H{"error": "Photo not accessible"})
-			return
-		}
+	// Check if photo is excluded (optimized: direct query instead of loading all exclusions)
+	var exclusionCount int64
+	database.DB.Model(&models.PhotoExclusion{}).Where("link_id = ? AND photo_id = ?", link.ID, photoIDUint).Count(&exclusionCount)
+	if exclusionCount > 0 {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Photo not accessible"})
+		return
 	}
 
 	var photo models.Photo
@@ -184,18 +184,18 @@ func DownloadSinglePhoto(c *gin.Context) {
 	}
 
 	var link models.ShareLink
-	result := database.DB.Where("token = ?", token).Preload("Exclusions").First(&link)
+	result := database.DB.Where("token = ?", token).First(&link)
 	if result.Error != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Share link not found"})
 		return
 	}
 
-	// Check if photo is excluded
-	for _, e := range link.Exclusions {
-		if e.PhotoID == uint(photoIDUint) {
-			c.JSON(http.StatusForbidden, gin.H{"error": "Photo not accessible"})
-			return
-		}
+	// Check if photo is excluded (optimized: direct query instead of loading all exclusions)
+	var exclusionCount int64
+	database.DB.Model(&models.PhotoExclusion{}).Where("link_id = ? AND photo_id = ?", link.ID, photoIDUint).Count(&exclusionCount)
+	if exclusionCount > 0 {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Photo not accessible"})
+		return
 	}
 
 	var photo models.Photo

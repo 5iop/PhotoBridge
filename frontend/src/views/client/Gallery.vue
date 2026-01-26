@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, computed, onUnmounted } from 'vue'
+import { ref, reactive, onMounted, computed, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 import * as api from '../../api'
 import { getUploadUrl, getShareThumbSmallUrl, getShareThumbLargeUrl } from '../../api'
@@ -10,6 +10,11 @@ const info = ref(null)
 const photos = ref([])
 const loading = ref(true)
 const error = ref('')
+
+// 跟踪缩略图加载失败的照片
+const failedThumbs = reactive(new Set())
+// 用于强制刷新缩略图的版本号
+const thumbVersions = reactive({})
 
 const lightboxPhoto = ref(null)
 const lightboxIndex = ref(0)
@@ -56,13 +61,26 @@ function getPhotoUrl(photo) {
   return `${getUploadUrl()}${photo.normal_url}`
 }
 
-// 获取缩略图URL
+// 获取缩略图URL（带版本号用于重试时刷新）
 function getThumbSmallUrl(photo) {
-  return getShareThumbSmallUrl(token.value, photo.id)
+  const baseUrl = getShareThumbSmallUrl(token.value, photo.id)
+  const version = thumbVersions[photo.id] || 0
+  return version > 0 ? `${baseUrl}?v=${version}` : baseUrl
 }
 
 function getThumbLargeUrl(photo) {
   return getShareThumbLargeUrl(token.value, photo.id)
+}
+
+// 检查缩略图是否加载失败
+function isThumbFailed(photo) {
+  return failedThumbs.has(photo.id)
+}
+
+// 重试加载缩略图
+function retryThumb(photo) {
+  failedThumbs.delete(photo.id)
+  thumbVersions[photo.id] = (thumbVersions[photo.id] || 0) + 1
 }
 
 // 当前预加载的照片ID（防止快速切换时状态混乱）
@@ -170,31 +188,17 @@ function handleFullscreenChange() {
   }
 }
 
-// 缩略图加载失败时，尝试用原图或显示占位图
+// 缩略图加载失败时，标记为失败状态
 function handleThumbError(event, photo) {
-  const img = event.target
-  // 如果有原图，降级使用原图（仅一次）
-  if (photo.normal_url && !img.dataset.fallback) {
-    img.dataset.fallback = 'true'
-    img.src = getPhotoUrl(photo)
-  } else if (!img.dataset.failed) {
-    // 最终降级：标记为失败，显示空状态
-    img.dataset.failed = 'true'
-    img.style.display = 'none'
-    // 父元素会显示只有RAW的提示样式（通过隐藏图片触发）
-  }
+  failedThumbs.add(photo.id)
 }
 
-// 灯箱缩略图加载失败处理
+// 灯箱缩略图加载失败处理（等待原图加载，不主动切换到原图URL）
 function handleLightboxThumbError(event) {
   const img = event.target
-  if (lightboxPhoto.value?.normal_url && !img.dataset.fallback) {
-    img.dataset.fallback = 'true'
-    img.src = getPhotoUrl(lightboxPhoto.value)
-    fullImageLoaded.value = true // 直接显示原图
-  } else if (!img.dataset.failed) {
-    // 最终降级：标记为失败
+  if (!img.dataset.failed) {
     img.dataset.failed = 'true'
+    // 不切换到原图URL，让preloadFullImage完成后自然切换
   }
 }
 
@@ -374,10 +378,22 @@ function download() {
             class="aspect-square rounded-lg sm:rounded-xl overflow-hidden bg-gray-100 cursor-pointer group relative"
             @click="openLightbox(index)"
           >
+            <!-- 缩略图加载失败时显示重试按钮 -->
+            <div
+              v-if="photo.normal_url && isThumbFailed(photo)"
+              class="w-full h-full flex flex-col items-center justify-center bg-gray-100 text-gray-400 hover:text-gray-600 hover:bg-gray-200 transition-colors cursor-pointer"
+              @click.stop="retryThumb(photo)"
+            >
+              <svg class="w-6 h-6 sm:w-8 sm:h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              <span class="text-[10px] sm:text-xs mt-1">点击重试</span>
+            </div>
             <!-- 有普通图片时显示缩略图 -->
             <img
-              v-if="photo.normal_url"
+              v-else-if="photo.normal_url"
               :src="getThumbSmallUrl(photo)"
+              :key="thumbVersions[photo.id] || 0"
               class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
               loading="lazy"
               @error="handleThumbError($event, photo)"

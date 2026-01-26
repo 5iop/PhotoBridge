@@ -97,15 +97,15 @@ function getPhotoUrl(photo) {
   return null
 }
 
-// 异步加载缩略图
+// 异步加载缩略图（不回退到原图，避免下载大文件）
 async function loadThumbSmall(photo) {
   if (thumbUrls[photo.id]) return
   const url = await fetchAdminThumbSmall(photo.id)
   if (url) {
     thumbUrls[photo.id] = url
   } else {
-    // Fallback to original image URL
-    thumbUrls[photo.id] = getPhotoUrl(photo) || 'error'
+    // 标记为错误状态，显示占位符
+    thumbUrls[photo.id] = 'error'
   }
 }
 
@@ -115,18 +115,40 @@ async function loadThumbLarge(photo) {
   if (url) {
     largeThumbUrls[photo.id] = url
   } else {
-    // Fallback to original image URL
-    largeThumbUrls[photo.id] = getPhotoUrl(photo) || 'error'
+    // 标记为错误状态，显示占位符
+    largeThumbUrls[photo.id] = 'error'
   }
 }
 
-// 获取已加载的缩略图URL
+// 获取已加载的缩略图URL（'error' 表示加载失败）
 function getThumbSmallUrl(photo) {
-  return thumbUrls[photo.id] || null
+  const url = thumbUrls[photo.id]
+  return url && url !== 'error' ? url : null
 }
 
 function getThumbLargeUrl(photo) {
-  return largeThumbUrls[photo.id] || null
+  const url = largeThumbUrls[photo.id]
+  return url && url !== 'error' ? url : null
+}
+
+// 检查缩略图是否加载失败
+function isThumbError(photo) {
+  return thumbUrls[photo.id] === 'error'
+}
+
+function isLargeThumbError(photo) {
+  return largeThumbUrls[photo.id] === 'error'
+}
+
+// 重试加载缩略图
+function retryThumbSmall(photo) {
+  delete thumbUrls[photo.id]
+  loadThumbSmall(photo)
+}
+
+function retryThumbLarge(photo) {
+  delete largeThumbUrls[photo.id]
+  loadThumbLarge(photo)
 }
 
 // 当前预加载的照片ID（防止快速切换时状态混乱）
@@ -150,31 +172,21 @@ function preloadFullImage(photo) {
   img.src = url
 }
 
-// 缩略图加载失败时，尝试用原图
+// 缩略图加载失败时，显示占位图（不回退到原图）
 function handleThumbError(event, photo) {
   const img = event.target
-  const url = getPhotoUrl(photo)
-  if (url && !img.dataset.fallback) {
-    img.dataset.fallback = 'true'
-    img.src = url
-  } else if (!img.dataset.failed) {
-    // 最终降级：标记为失败，隐藏图片
+  if (!img.dataset.failed) {
     img.dataset.failed = 'true'
     img.style.display = 'none'
   }
 }
 
-// 预览缩略图加载失败处理
+// 预览缩略图加载失败处理（等待原图加载，不主动切换）
 function handlePreviewThumbError(event) {
   const img = event.target
-  const url = getPhotoUrl(previewPhoto.value)
-  if (url && !img.dataset.fallback) {
-    img.dataset.fallback = 'true'
-    img.src = url
-    fullImageLoaded.value = true
-  } else if (!img.dataset.failed) {
-    // 最终降级：标记为失败
+  if (!img.dataset.failed) {
     img.dataset.failed = 'true'
+    // 不切换到原图URL，让preloadFullImage完成后自然切换
   }
 }
 
@@ -633,6 +645,13 @@ function toggleExclusion(photoId) {
             >
               <!-- 有缩略图URL时显示图片 -->
               <img v-if="photo.normal_ext && getThumbSmallUrl(photo)" :src="getThumbSmallUrl(photo)" class="w-full h-full object-cover" loading="lazy" @error="handleThumbError($event, photo)" />
+              <!-- 缩略图加载失败时显示可点击的刷新按钮 -->
+              <div v-else-if="photo.normal_ext && isThumbError(photo)" class="w-full h-full flex flex-col items-center justify-center bg-gray-100 text-gray-400 hover:text-gray-600 hover:bg-gray-200 transition-colors" @click.stop="retryThumbSmall(photo)">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                <span class="text-[9px] mt-0.5">点击重试</span>
+              </div>
               <!-- 正在加载缩略图时显示加载器 -->
               <div v-else-if="photo.normal_ext && !getThumbSmallUrl(photo)" class="w-full h-full flex items-center justify-center bg-gray-100">
                 <svg class="w-6 h-6 text-gray-400 spinner" fill="none" viewBox="0 0 24 24">
@@ -932,6 +951,11 @@ function toggleExclusion(photoId) {
                 @click="toggleExclusion(photo.id)"
               >
                 <img v-if="photo.normal_ext && getThumbSmallUrl(photo)" :src="getThumbSmallUrl(photo)" class="w-full h-full object-cover" :class="newExclusions.has(photo.id) ? 'opacity-40' : ''" @error="handleThumbError($event, photo)" />
+                <div v-else-if="photo.normal_ext && isThumbError(photo)" class="w-full h-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors" @click.stop="retryThumbSmall(photo)">
+                  <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                </div>
                 <div v-else-if="photo.normal_ext && !getThumbSmallUrl(photo)" class="w-full h-full bg-gray-100 flex items-center justify-center">
                   <svg class="w-4 h-4 text-gray-400 spinner" fill="none" viewBox="0 0 24 24">
                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>

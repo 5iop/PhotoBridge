@@ -112,19 +112,19 @@ func getSharePhoto(c *gin.Context) (*models.Photo, bool) {
 		return nil, false
 	}
 
-	// 验证分享链接
+	// 验证分享链接（不预加载 Exclusions，按需查询）
 	var link models.ShareLink
-	if err := database.DB.Preload("Exclusions").Where("token = ?", token).First(&link).Error; err != nil {
+	if err := database.DB.Where("token = ?", token).First(&link).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Share link not found"})
 		return nil, false
 	}
 
-	// 检查照片是否被排除
-	for _, exclusion := range link.Exclusions {
-		if exclusion.PhotoID == uint(photoIDUint) {
-			c.JSON(http.StatusForbidden, gin.H{"error": "Photo not accessible"})
-			return nil, false
-		}
+	// 只检查这一张照片是否被排除（优化：直接查询而非加载所有排除项）
+	var exclusionCount int64
+	database.DB.Model(&models.PhotoExclusion{}).Where("link_id = ? AND photo_id = ?", link.ID, photoIDUint).Count(&exclusionCount)
+	if exclusionCount > 0 {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Photo not accessible"})
+		return nil, false
 	}
 
 	var photo models.Photo
