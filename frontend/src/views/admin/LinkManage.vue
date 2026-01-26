@@ -126,7 +126,7 @@ function openCreateModal() {
 <template>
   <div class="min-h-screen">
     <!-- Header -->
-    <header class="bg-dark-400 border-b border-dark-200">
+    <header class="bg-white border-b border-cf-border">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
         <div class="flex items-center gap-4">
           <button @click="router.push(`/admin/project/${projectId}`)" class="btn btn-secondary">
@@ -135,8 +135,8 @@ function openCreateModal() {
             </svg>
           </button>
           <div class="flex-1">
-            <h1 class="text-xl font-bold text-white">分享链接</h1>
-            <p class="text-sm text-gray-400">{{ project?.name || '加载中...' }}</p>
+            <h1 class="text-xl font-bold text-cf-text">分享链接</h1>
+            <p class="text-sm text-cf-muted">{{ project?.name || '加载中...' }}</p>
           </div>
           <button @click="openCreateModal" class="btn btn-primary">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -160,13 +160,13 @@ function openCreateModal() {
 
       <!-- Empty state -->
       <div v-else-if="!links.length" class="text-center py-16">
-        <div class="inline-flex items-center justify-center w-16 h-16 rounded-xl bg-dark-300 mb-4">
-          <svg class="w-8 h-8 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div class="inline-flex items-center justify-center w-16 h-16 rounded-xl bg-gray-100 mb-4">
+          <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
           </svg>
         </div>
-        <h3 class="text-lg font-medium text-white mb-2">暂无分享链接</h3>
-        <p class="text-gray-400 mb-4">创建链接以便与客户分享此项目</p>
+        <h3 class="text-lg font-medium text-cf-text mb-2">暂无分享链接</h3>
+        <p class="text-cf-muted mb-4">创建链接以便与客户分享此项目</p>
         <button @click="openCreateModal" class="btn btn-primary">
           创建链接
         </button>
@@ -177,22 +177,22 @@ function openCreateModal() {
         <div v-for="link in links" :key="link.id" class="card p-6">
           <div class="flex items-start justify-between gap-4">
             <div class="flex-1 min-w-0">
-              <h3 class="font-semibold text-white">{{ link.alias || '未命名链接' }}</h3>
-              <p class="text-sm text-gray-400 truncate mt-1">{{ getShareUrl(link) }}</p>
+              <h3 class="font-semibold text-cf-text">{{ link.alias || '未命名链接' }}</h3>
+              <p class="text-sm text-cf-muted truncate mt-1">{{ getShareUrl(link) }}</p>
               <div class="flex items-center gap-4 mt-3">
-                <span v-if="link.allow_raw" class="inline-flex items-center gap-1 text-xs text-primary-400">
+                <span v-if="link.allow_raw" class="inline-flex items-center gap-1 text-xs text-primary-600">
                   <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
                   </svg>
                   允许 RAW
                 </span>
-                <span v-else class="inline-flex items-center gap-1 text-xs text-gray-500">
+                <span v-else class="inline-flex items-center gap-1 text-xs text-cf-muted">
                   <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                   </svg>
                   禁止 RAW
                 </span>
-                <span v-if="link.exclusions?.length" class="text-xs text-gray-500">
+                <span v-if="link.exclusions?.length" class="text-xs text-cf-muted">
                   {{ link.exclusions.length }} 张照片已隐藏
                 </span>
               </div>
@@ -210,7 +210,7 @@ function openCreateModal() {
                 </svg>
                 编辑
               </button>
-              <button @click="deleteLink(link)" class="btn btn-secondary text-sm text-red-400 hover:text-red-300">
+              <button @click="deleteLink(link)" class="btn btn-secondary text-sm text-red-500 hover:text-red-600 hover:bg-red-50">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                 </svg>
@@ -222,9 +222,9 @@ function openCreateModal() {
     </main>
 
     <!-- Create/Edit Modal -->
-    <div v-if="showCreateModal || showEditModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 overflow-y-auto">
+    <div v-if="showCreateModal || showEditModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/30 overflow-y-auto">
       <div class="card p-6 w-full max-w-2xl my-8" @click.stop>
-        <h3 class="text-lg font-semibold text-white mb-4">
+        <h3 class="text-lg font-semibold text-cf-text mb-4">
           {{ showEditModal ? '编辑链接' : '创建新链接' }}
         </h3>
 
@@ -243,25 +243,25 @@ function openCreateModal() {
             <button
               @click="newAllowRaw = !newAllowRaw"
               class="relative w-12 h-6 rounded-full transition-colors"
-              :class="newAllowRaw ? 'bg-primary-500' : 'bg-dark-200'"
+              :class="newAllowRaw ? 'bg-primary-500' : 'bg-gray-200'"
             >
               <span
-                class="absolute top-1 w-4 h-4 rounded-full bg-white transition-transform"
+                class="absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-transform"
                 :class="newAllowRaw ? 'left-7' : 'left-1'"
               ></span>
             </button>
-            <span class="text-gray-300">允许下载 RAW 文件</span>
+            <span class="text-cf-text">允许下载 RAW 文件</span>
           </div>
 
           <div>
             <label class="label">隐藏的照片（点击切换）</label>
-            <p class="text-sm text-gray-500 mb-3">选中的照片将不会在此链接中显示</p>
+            <p class="text-sm text-cf-muted mb-3">选中的照片将不会在此链接中显示</p>
             <div class="grid grid-cols-4 sm:grid-cols-6 gap-2 max-h-64 overflow-y-auto p-1">
               <div
                 v-for="photo in photos"
                 :key="photo.id"
                 class="aspect-square rounded-lg overflow-hidden cursor-pointer relative"
-                :class="newExclusions.has(photo.id) ? 'ring-2 ring-red-500' : 'ring-1 ring-dark-100'"
+                :class="newExclusions.has(photo.id) ? 'ring-2 ring-red-500' : 'ring-1 ring-cf-border'"
                 @click="toggleExclusion(photo.id)"
               >
                 <img
@@ -270,14 +270,14 @@ function openCreateModal() {
                   class="w-full h-full object-cover"
                   :class="newExclusions.has(photo.id) ? 'opacity-50' : ''"
                 />
-                <div v-else class="w-full h-full bg-dark-300 flex items-center justify-center text-xs text-gray-500">
+                <div v-else class="w-full h-full bg-gray-100 flex items-center justify-center text-xs text-cf-muted">
                   RAW
                 </div>
                 <div
                   v-if="newExclusions.has(photo.id)"
                   class="absolute inset-0 flex items-center justify-center bg-red-500/30"
                 >
-                  <svg class="w-6 h-6 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg class="w-6 h-6 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
                   </svg>
                 </div>

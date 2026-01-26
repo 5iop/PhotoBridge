@@ -20,17 +20,15 @@ export default {
           800: '#9a3412',
           900: '#7c2d12',
         },
-        // Cloudflare dark theme grays
-        dark: {
-          100: '#404040',
-          200: '#363636',
-          300: '#2c2c2c',
-          400: '#242424',
-          500: '#1d1d1d',
-          600: '#171717',
-          700: '#111111',
-          800: '#0a0a0a',
-          900: '#050505',
+        // Cloudflare light theme
+        cf: {
+          bg: '#f4f5f7',        // Main background
+          card: '#ffffff',      // Card background
+          sidebar: '#fbfbfc',   // Sidebar background
+          border: '#e5e7eb',    // Border color
+          text: '#1d1d1d',      // Primary text
+          muted: '#6b7280',     // Muted text
+          hover: '#f9fafb',     // Hover state
         }
       },
     },

@@ -26,7 +26,7 @@ function handleBackdropClick() {
     <Transition name="modal">
       <div
         v-if="show"
-        class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
+        class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/30"
         @click="handleBackdropClick"
       >
         <div
@@ -35,10 +35,10 @@ function handleBackdropClick() {
           @click.stop
         >
           <div v-if="title" class="flex items-center justify-between mb-4">
-            <h3 class="text-lg font-semibold text-white">{{ title }}</h3>
+            <h3 class="text-lg font-semibold text-cf-text">{{ title }}</h3>
             <button
               @click="emit('close')"
-              class="text-gray-400 hover:text-white transition-colors"
+              class="text-cf-muted hover:text-cf-text transition-colors"
             >
               <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />

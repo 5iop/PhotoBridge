@@ -4,7 +4,7 @@
 
 @layer base {
   body {
-    @apply bg-dark-500 text-gray-100 font-sans antialiased;
+    @apply bg-cf-bg text-cf-text font-sans antialiased;
     margin: 0;
   }
 }
@@ -15,47 +15,47 @@
   }
 
   .btn-primary {
-    @apply bg-primary-500 text-white hover:bg-primary-400 shadow-md shadow-primary-500/20;
+    @apply bg-primary-500 text-white hover:bg-primary-600 shadow-sm;
   }
 
   .btn-secondary {
-    @apply bg-dark-300 text-gray-300 hover:bg-dark-200 border border-dark-100;
+    @apply bg-white text-gray-700 hover:bg-gray-50 border border-cf-border;
   }
 
   .btn-danger {
-    @apply bg-red-600 text-white hover:bg-red-500;
+    @apply bg-red-600 text-white hover:bg-red-700;
   }
 
   .card {
-    @apply bg-dark-400 rounded-lg border border-dark-200 overflow-hidden;
+    @apply bg-cf-card rounded-lg border border-cf-border overflow-hidden shadow-sm;
   }
 
   .input {
-    @apply w-full px-4 py-3 bg-dark-300 border border-dark-100 rounded-lg text-gray-100 placeholder-gray-500 focus:outline-none focus:border-primary-500 focus:ring-1 focus:ring-primary-500 transition-all;
+    @apply w-full px-4 py-3 bg-white border border-cf-border rounded-lg text-cf-text placeholder-gray-400 focus:outline-none focus:border-primary-500 focus:ring-1 focus:ring-primary-500 transition-all;
   }
 
   .label {
-    @apply block text-sm font-medium text-gray-400 mb-2;
+    @apply block text-sm font-medium text-cf-muted mb-2;
   }
 }
 
-/* Custom scrollbar - Cloudflare style */
+/* Custom scrollbar - Cloudflare light style */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #1d1d1d;
+  background: #f4f5f7;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #404040;
+  background: #d1d5db;
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #525252;
+  background: #9ca3af;
 }
 
 /* Photo grid animations */

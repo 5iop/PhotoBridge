@@ -61,7 +61,7 @@ function getCoverUrl(project) {
 <template>
   <div class="min-h-screen">
     <!-- Header -->
-    <header class="bg-dark-400 border-b border-dark-200">
+    <header class="bg-white border-b border-cf-border">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
         <div class="flex items-center gap-3">
           <div class="w-10 h-10 rounded-lg bg-primary-500 flex items-center justify-center">
@@ -69,7 +69,7 @@ function getCoverUrl(project) {
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
             </svg>
           </div>
-          <h1 class="text-xl font-bold text-white">PhotoBridge</h1>
+          <h1 class="text-xl font-bold text-cf-text">PhotoBridge</h1>
         </div>
         <button @click="logout" class="btn btn-secondary text-sm">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -83,7 +83,7 @@ function getCoverUrl(project) {
     <!-- Main content -->
     <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div class="flex items-center justify-between mb-8">
-        <h2 class="text-2xl font-bold text-white">项目列表</h2>
+        <h2 class="text-2xl font-bold text-cf-text">项目列表</h2>
         <button @click="showCreateModal = true" class="btn btn-primary">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
@@ -102,13 +102,13 @@ function getCoverUrl(project) {
 
       <!-- Empty state -->
       <div v-else-if="!projectStore.projects.length" class="text-center py-16">
-        <div class="inline-flex items-center justify-center w-16 h-16 rounded-xl bg-dark-300 mb-4">
-          <svg class="w-8 h-8 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div class="inline-flex items-center justify-center w-16 h-16 rounded-xl bg-gray-100 mb-4">
+          <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
           </svg>
         </div>
-        <h3 class="text-lg font-medium text-white mb-2">暂无项目</h3>
-        <p class="text-gray-400 mb-4">创建您的第一个项目开始使用</p>
+        <h3 class="text-lg font-medium text-cf-text mb-2">暂无项目</h3>
+        <p class="text-cf-muted mb-4">创建您的第一个项目开始使用</p>
         <button @click="showCreateModal = true" class="btn btn-primary">
           创建项目
         </button>
@@ -119,11 +119,11 @@ function getCoverUrl(project) {
         <div
           v-for="project in projectStore.projects"
           :key="project.id"
-          class="card group cursor-pointer hover:border-primary-500/50 transition-all"
+          class="card group cursor-pointer hover:border-primary-500 hover:shadow-md transition-all"
           @click="router.push(`/admin/project/${project.id}`)"
         >
           <!-- Cover image -->
-          <div class="aspect-[4/3] bg-dark-300 relative overflow-hidden">
+          <div class="aspect-[4/3] bg-gray-100 relative overflow-hidden">
             <img
               v-if="getCoverUrl(project)"
               :src="getCoverUrl(project)"
@@ -131,7 +131,7 @@ function getCoverUrl(project) {
               alt=""
             />
             <div v-else class="w-full h-full flex items-center justify-center">
-              <svg class="w-12 h-12 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg class="w-12 h-12 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
               </svg>
             </div>
@@ -139,8 +139,8 @@ function getCoverUrl(project) {
 
           <!-- Info -->
           <div class="p-4">
-            <h3 class="font-semibold text-white truncate">{{ project.name }}</h3>
-            <p class="text-sm text-gray-400 mt-1">{{ project.photo_count || 0 }} 张照片</p>
+            <h3 class="font-semibold text-cf-text truncate">{{ project.name }}</h3>
+            <p class="text-sm text-cf-muted mt-1">{{ project.photo_count || 0 }} 张照片</p>
           </div>
 
           <!-- Actions -->
@@ -156,7 +156,7 @@ function getCoverUrl(project) {
             </button>
             <button
               @click.stop="handleDelete(project)"
-              class="btn btn-secondary text-sm text-red-400 hover:text-red-300"
+              class="btn btn-secondary text-sm text-red-500 hover:text-red-600 hover:bg-red-50"
             >
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />

@@ -522,7 +522,7 @@ function toggleExclusion(photoId) {
 <template>
   <div class="min-h-screen">
     <!-- Header -->
-    <header class="bg-dark-400 border-b border-dark-200">
+    <header class="bg-white border-b border-cf-border">
       <div class="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 py-4">
         <div class="flex items-center gap-4">
           <button @click="router.push('/admin')" class="btn btn-secondary">
@@ -531,8 +531,8 @@ function toggleExclusion(photoId) {
             </svg>
           </button>
           <div class="flex-1">
-            <h1 class="text-xl font-bold text-white">{{ project?.name || '加载中...' }}</h1>
-            <p class="text-sm text-gray-400">{{ photos.length }} 张照片 · {{ links.length }} 个链接</p>
+            <h1 class="text-xl font-bold text-cf-text">{{ project?.name || '加载中...' }}</h1>
+            <p class="text-sm text-cf-muted">{{ photos.length }} 张照片 · {{ links.length }} 个链接</p>
           </div>
         </div>
       </div>
@@ -544,7 +544,7 @@ function toggleExclusion(photoId) {
         <!-- Left: Photos -->
         <div class="flex-1 min-w-0">
           <!-- FilePond Upload area -->
-          <div class="filepond-dark mb-6">
+          <div class="filepond-light mb-6">
             <FilePond
               ref="pond"
               name="files"
@@ -568,7 +568,7 @@ function toggleExclusion(photoId) {
               <button @click="selectAll" class="btn btn-secondary text-sm py-1.5">
                 {{ selectedPhotos.size === photos.length ? '取消全选' : '全选' }}
               </button>
-              <span v-if="selectedPhotos.size" class="text-sm text-gray-400">已选择 {{ selectedPhotos.size }} 张</span>
+              <span v-if="selectedPhotos.size" class="text-sm text-cf-muted">已选择 {{ selectedPhotos.size }} 张</span>
             </div>
             <button v-if="selectedPhotos.size" @click="deleteSelected" class="btn btn-danger text-sm py-1.5">
               删除
@@ -588,21 +588,21 @@ function toggleExclusion(photoId) {
             <div
               v-for="photo in photos"
               :key="photo.id"
-              class="group relative aspect-square rounded-lg overflow-hidden bg-dark-300 cursor-pointer"
+              class="group relative aspect-square rounded-lg overflow-hidden bg-gray-100 cursor-pointer"
               :class="selectedPhotos.has(photo.id) ? 'ring-2 ring-primary-500' : ''"
               @click="toggleSelect(photo.id)"
             >
               <!-- 有缩略图URL时显示图片 -->
               <img v-if="photo.normal_ext && getThumbSmallUrl(photo)" :src="getThumbSmallUrl(photo)" class="w-full h-full object-cover" loading="lazy" @error="handleThumbError($event, photo)" />
               <!-- 正在加载缩略图时显示加载器 -->
-              <div v-else-if="photo.normal_ext && !getThumbSmallUrl(photo)" class="w-full h-full flex items-center justify-center bg-dark-300">
-                <svg class="w-6 h-6 text-gray-500 spinner" fill="none" viewBox="0 0 24 24">
+              <div v-else-if="photo.normal_ext && !getThumbSmallUrl(photo)" class="w-full h-full flex items-center justify-center bg-gray-100">
+                <svg class="w-6 h-6 text-gray-400 spinner" fill="none" viewBox="0 0 24 24">
                   <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                   <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
                 </svg>
               </div>
               <!-- 只有RAW时显示提示 -->
-              <div v-else class="w-full h-full flex flex-col items-center justify-center text-gray-500">
+              <div v-else class="w-full h-full flex flex-col items-center justify-center text-gray-400">
                 <svg class="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                 </svg>
@@ -635,10 +635,10 @@ function toggleExclusion(photoId) {
 
           <!-- Empty -->
           <div v-else class="text-center py-12">
-            <svg class="w-12 h-12 mx-auto text-gray-600 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg class="w-12 h-12 mx-auto text-gray-300 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
             </svg>
-            <p class="text-gray-400">暂无照片</p>
+            <p class="text-cf-muted">暂无照片</p>
           </div>
         </div>
 
@@ -646,7 +646,7 @@ function toggleExclusion(photoId) {
         <div class="w-80 flex-shrink-0">
           <div class="card p-4 sticky top-4">
             <div class="flex items-center justify-between mb-4">
-              <h2 class="font-semibold text-white">分享链接</h2>
+              <h2 class="font-semibold text-cf-text">分享链接</h2>
               <button @click="openCreateModal" class="btn btn-primary text-sm py-1.5 px-3">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
@@ -657,24 +657,24 @@ function toggleExclusion(photoId) {
 
             <!-- Links list -->
             <div v-if="links.length" class="space-y-3">
-              <div v-for="link in links" :key="link.id" class="p-3 rounded-xl bg-dark-300 group">
+              <div v-for="link in links" :key="link.id" class="p-3 rounded-xl bg-gray-50 border border-cf-border group">
                 <div class="flex items-start justify-between gap-2 mb-2">
                   <div class="min-w-0">
-                    <p class="font-medium text-white text-sm truncate">{{ link.alias || '未命名' }}</p>
-                    <p class="text-xs text-gray-500 font-mono truncate">/share/{{ link.token }}</p>
+                    <p class="font-medium text-cf-text text-sm truncate">{{ link.alias || '未命名' }}</p>
+                    <p class="text-xs text-cf-muted font-mono truncate">/share/{{ link.token }}</p>
                   </div>
                   <div class="flex gap-1">
-                    <button @click="copyLink(link)" class="p-1.5 rounded hover:bg-dark-200 text-gray-400 hover:text-white" title="复制链接">
+                    <button @click="copyLink(link)" class="p-1.5 rounded hover:bg-gray-200 text-cf-muted hover:text-cf-text" title="复制链接">
                       <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
                       </svg>
                     </button>
-                    <button @click="openEditModal(link)" class="p-1.5 rounded hover:bg-dark-200 text-gray-400 hover:text-white" title="编辑">
+                    <button @click="openEditModal(link)" class="p-1.5 rounded hover:bg-gray-200 text-cf-muted hover:text-cf-text" title="编辑">
                       <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                       </svg>
                     </button>
-                    <button @click="deleteLink(link)" class="p-1.5 rounded hover:bg-dark-200 text-gray-400 hover:text-red-400" title="删除">
+                    <button @click="deleteLink(link)" class="p-1.5 rounded hover:bg-red-50 text-cf-muted hover:text-red-500" title="删除">
                       <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                       </svg>
@@ -682,14 +682,14 @@ function toggleExclusion(photoId) {
                   </div>
                 </div>
                 <div class="flex items-center gap-2 text-xs">
-                  <span v-if="link.allow_raw" class="text-primary-400">允许RAW</span>
-                  <span v-else class="text-gray-500">禁止RAW</span>
-                  <span v-if="link.exclusions?.length" class="text-gray-500">· {{ link.exclusions.length }} 张隐藏</span>
+                  <span v-if="link.allow_raw" class="text-primary-600">允许RAW</span>
+                  <span v-else class="text-cf-muted">禁止RAW</span>
+                  <span v-if="link.exclusions?.length" class="text-cf-muted">· {{ link.exclusions.length }} 张隐藏</span>
                 </div>
               </div>
             </div>
 
-            <div v-else class="text-center py-8 text-gray-500 text-sm">
+            <div v-else class="text-center py-8 text-cf-muted text-sm">
               <p>暂无链接</p>
             </div>
           </div>
@@ -870,9 +870,9 @@ function toggleExclusion(photoId) {
     </div>
 
     <!-- Link Modal -->
-    <div v-if="showLinkModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60">
+    <div v-if="showLinkModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/30">
       <div class="card p-5 w-full max-w-lg max-h-[80vh] overflow-y-auto" @click.stop>
-        <h3 class="text-lg font-semibold text-white mb-4">{{ editingLink ? '编辑链接' : '创建链接' }}</h3>
+        <h3 class="text-lg font-semibold text-cf-text mb-4">{{ editingLink ? '编辑链接' : '创建链接' }}</h3>
 
         <div class="space-y-4">
           <div>
@@ -881,10 +881,10 @@ function toggleExclusion(photoId) {
           </div>
 
           <div class="flex items-center gap-3">
-            <button @click="newAllowRaw = !newAllowRaw" class="relative w-10 h-5 rounded-full transition-colors" :class="newAllowRaw ? 'bg-primary-500' : 'bg-dark-200'">
-              <span class="absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform" :class="newAllowRaw ? 'left-5' : 'left-0.5'"></span>
+            <button @click="newAllowRaw = !newAllowRaw" class="relative w-10 h-5 rounded-full transition-colors" :class="newAllowRaw ? 'bg-primary-500' : 'bg-gray-200'">
+              <span class="absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform" :class="newAllowRaw ? 'left-5' : 'left-0.5'"></span>
             </button>
-            <span class="text-sm text-gray-300">允许下载 RAW 文件</span>
+            <span class="text-sm text-cf-text">允许下载 RAW 文件</span>
           </div>
 
           <div>
@@ -894,19 +894,19 @@ function toggleExclusion(photoId) {
                 v-for="photo in photos"
                 :key="photo.id"
                 class="aspect-square rounded overflow-hidden cursor-pointer relative"
-                :class="newExclusions.has(photo.id) ? 'ring-2 ring-red-500' : 'ring-1 ring-dark-100'"
+                :class="newExclusions.has(photo.id) ? 'ring-2 ring-red-500' : 'ring-1 ring-cf-border'"
                 @click="toggleExclusion(photo.id)"
               >
                 <img v-if="photo.normal_ext && getThumbSmallUrl(photo)" :src="getThumbSmallUrl(photo)" class="w-full h-full object-cover" :class="newExclusions.has(photo.id) ? 'opacity-40' : ''" @error="handleThumbError($event, photo)" />
-                <div v-else-if="photo.normal_ext && !getThumbSmallUrl(photo)" class="w-full h-full bg-dark-300 flex items-center justify-center">
-                  <svg class="w-4 h-4 text-gray-500 spinner" fill="none" viewBox="0 0 24 24">
+                <div v-else-if="photo.normal_ext && !getThumbSmallUrl(photo)" class="w-full h-full bg-gray-100 flex items-center justify-center">
+                  <svg class="w-4 h-4 text-gray-400 spinner" fill="none" viewBox="0 0 24 24">
                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                     <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
                   </svg>
                 </div>
-                <div v-else class="w-full h-full bg-dark-300 flex items-center justify-center text-[8px] text-gray-500">只有RAW</div>
+                <div v-else class="w-full h-full bg-gray-100 flex items-center justify-center text-[8px] text-cf-muted">只有RAW</div>
                 <div v-if="newExclusions.has(photo.id)" class="absolute inset-0 flex items-center justify-center">
-                  <svg class="w-4 h-4 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg class="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                   </svg>
                 </div>
@@ -931,97 +931,97 @@ function toggleExclusion(photoId) {
 </style>
 
 <style>
-/* FilePond dark theme */
-.filepond-dark .filepond--panel-root {
-  background-color: #1e1e2e;
-  border: 2px dashed #3d3d5c;
+/* FilePond light theme (Cloudflare style) */
+.filepond-light .filepond--panel-root {
+  background-color: #ffffff;
+  border: 2px dashed #e5e7eb;
   border-radius: 0.75rem;
 }
 
-.filepond-dark .filepond--drop-label {
-  color: #9ca3af;
+.filepond-light .filepond--drop-label {
+  color: #6b7280;
   font-size: 0.9rem;
 }
 
-.filepond-dark .filepond--drop-label label {
+.filepond-light .filepond--drop-label label {
   cursor: pointer;
 }
 
-.filepond-dark .filepond--label-action {
-  color: #8b5cf6;
+.filepond-light .filepond--label-action {
+  color: #f6821f;
   text-decoration: underline;
-  text-decoration-color: rgba(139, 92, 246, 0.4);
+  text-decoration-color: rgba(246, 130, 31, 0.4);
 }
 
-.filepond-dark .filepond--label-action:hover {
-  color: #a78bfa;
+.filepond-light .filepond--label-action:hover {
+  color: #ea580c;
 }
 
-.filepond-dark .filepond--item-panel {
-  background-color: #2d2d44;
+.filepond-light .filepond--item-panel {
+  background-color: #f3f4f6;
   border-radius: 0.5rem;
 }
 
-.filepond-dark .filepond--file-action-button {
+.filepond-light .filepond--file-action-button {
   cursor: pointer;
-  color: white;
-  background-color: rgba(0, 0, 0, 0.5);
+  color: #374151;
+  background-color: rgba(0, 0, 0, 0.1);
 }
 
-.filepond-dark .filepond--file-action-button:hover {
-  background-color: rgba(0, 0, 0, 0.7);
+.filepond-light .filepond--file-action-button:hover {
+  background-color: rgba(0, 0, 0, 0.2);
 }
 
-.filepond-dark .filepond--file {
-  color: white;
+.filepond-light .filepond--file {
+  color: #1f2937;
 }
 
-.filepond-dark .filepond--file-info {
-  color: rgba(255, 255, 255, 0.85);
+.filepond-light .filepond--file-info {
+  color: #374151;
 }
 
-.filepond-dark .filepond--file-info .filepond--file-info-sub {
-  color: rgba(255, 255, 255, 0.5);
+.filepond-light .filepond--file-info .filepond--file-info-sub {
+  color: #6b7280;
 }
 
-.filepond-dark .filepond--file-status {
-  color: rgba(255, 255, 255, 0.65);
+.filepond-light .filepond--file-status {
+  color: #6b7280;
 }
 
-.filepond-dark .filepond--drip-blob {
-  background-color: #8b5cf6;
+.filepond-light .filepond--drip-blob {
+  background-color: #f6821f;
 }
 
 /* Processing state */
-.filepond-dark .filepond--item[data-filepond-item-state='processing'] .filepond--item-panel {
-  background-color: #3730a3;
+.filepond-light .filepond--item[data-filepond-item-state='processing'] .filepond--item-panel {
+  background-color: #fef3c7;
 }
 
-.filepond-dark .filepond--item[data-filepond-item-state='processing-complete'] .filepond--item-panel {
-  background-color: #065f46;
+.filepond-light .filepond--item[data-filepond-item-state='processing-complete'] .filepond--item-panel {
+  background-color: #d1fae5;
 }
 
 /* Error state */
-.filepond-dark [data-filepond-item-state='processing-error'] .filepond--item-panel,
-.filepond-dark [data-filepond-item-state='load-error'] .filepond--item-panel {
-  background-color: #991b1b;
+.filepond-light [data-filepond-item-state='processing-error'] .filepond--item-panel,
+.filepond-light [data-filepond-item-state='load-error'] .filepond--item-panel {
+  background-color: #fee2e2;
 }
 
 /* Progress indicator */
-.filepond-dark .filepond--progress-indicator {
-  color: white;
+.filepond-light .filepond--progress-indicator {
+  color: #374151;
 }
 
-.filepond-dark .filepond--load-indicator {
-  color: white;
+.filepond-light .filepond--load-indicator {
+  color: #374151;
 }
 
 /* Image preview plugin */
-.filepond-dark .filepond--image-preview-overlay-idle {
-  color: rgba(255, 255, 255, 0.85);
+.filepond-light .filepond--image-preview-overlay-idle {
+  color: rgba(0, 0, 0, 0.85);
 }
 
-.filepond-dark .filepond--image-preview-wrapper {
+.filepond-light .filepond--image-preview-wrapper {
   border-radius: 0.375rem;
   overflow: hidden;
 }

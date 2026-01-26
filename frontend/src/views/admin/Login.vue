@@ -41,12 +41,12 @@ async function handleLogin() {
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
           </svg>
         </div>
-        <h1 class="text-2xl font-bold text-white">PhotoBridge</h1>
-        <p class="text-gray-400 mt-1">管理员登录</p>
+        <h1 class="text-2xl font-bold text-cf-text">PhotoBridge</h1>
+        <p class="text-cf-muted mt-1">管理员登录</p>
       </div>
 
       <!-- Error message -->
-      <div v-if="error" class="mb-4 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
+      <div v-if="error" class="mb-4 p-3 rounded-lg bg-red-50 border border-red-200 text-red-600 text-sm">
         {{ error }}
       </div>
 
