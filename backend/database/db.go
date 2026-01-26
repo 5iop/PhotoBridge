@@ -29,28 +29,12 @@ func Init() {
 	log.Printf("%s Database directory created/verified: %s", shortname, dir)
 
 	// Check if database file exists
-	dbExists := false
-	if _, err := os.Stat(config.AppConfig.DatabasePath); err == nil {
-		dbExists = true
-		log.Printf("%s Database file exists: %s", shortname, config.AppConfig.DatabasePath)
-
-		// Check if database file is writable
-		if f, err := os.OpenFile(config.AppConfig.DatabasePath, os.O_RDWR, 0644); err != nil {
-			log.Printf("%s Database file is not writable, removing: %v", shortname, err)
-			if err := os.Remove(config.AppConfig.DatabasePath); err != nil {
-				log.Fatalf("%s Failed to remove readonly database file: %v", shortname, err)
-			}
-			dbExists = false
-			log.Printf("%s Readonly database file removed", shortname)
-		} else {
-			f.Close()
-		}
-	} else if !os.IsNotExist(err) {
-		log.Fatalf("%s Failed to check database file: %v", shortname, err)
-	}
-
-	if !dbExists {
+	if _, err := os.Stat(config.AppConfig.DatabasePath); os.IsNotExist(err) {
 		log.Printf("%s Database file does not exist, will be created: %s", shortname, config.AppConfig.DatabasePath)
+	} else if err != nil {
+		log.Fatalf("%s Failed to check database file: %v", shortname, err)
+	} else {
+		log.Printf("%s Database file exists: %s", shortname, config.AppConfig.DatabasePath)
 	}
 
 	log.Printf("%s Connecting to database: %s", shortname, config.AppConfig.DatabasePath)

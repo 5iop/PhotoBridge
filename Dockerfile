@@ -60,9 +60,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     wget \
     && rm -rf /var/lib/apt/lists/*
 
-# Create non-root user
-RUN useradd -m -u 1000 photobridge
-
 WORKDIR /app
 
 # Copy binary from backend builder
@@ -72,11 +69,7 @@ COPY --from=backend-builder /app/backend/photobridge .
 COPY --from=frontend-builder /app/frontend/dist ./frontend/dist
 
 # Create directories for data and uploads
-RUN mkdir -p /app/data /app/uploads && \
-    chown -R photobridge:photobridge /app
-
-# Switch to non-root user
-USER photobridge
+RUN mkdir -p /app/data /app/uploads
 
 # Environment variables
 ENV PORT=80 \
