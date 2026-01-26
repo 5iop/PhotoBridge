@@ -7,11 +7,9 @@ import { getUploadUrl, fetchAdminThumbSmall, fetchAdminThumbLarge, clearThumbCac
 // FilePond imports
 import vueFilePond from 'vue-filepond'
 import 'filepond/dist/filepond.min.css'
-import 'filepond-plugin-image-preview/dist/filepond-plugin-image-preview.min.css'
 import FilePondPluginFileValidateType from 'filepond-plugin-file-validate-type'
-import FilePondPluginImagePreview from 'filepond-plugin-image-preview'
 
-const FilePond = vueFilePond(FilePondPluginFileValidateType, FilePondPluginImagePreview)
+const FilePond = vueFilePond(FilePondPluginFileValidateType)
 
 const route = useRoute()
 const router = useRouter()
@@ -180,89 +178,104 @@ function handlePreviewThumbError(event) {
   }
 }
 
-// FilePond server configuration
+// FilePond server configuration with auto-retry
 const filePondServer = computed(() => ({
   process: async (fieldName, file, metadata, load, error, progress, abort) => {
+    const MAX_RETRIES = 3
+    const RETRY_DELAY = 2000  // 2 seconds
+
     let aborted = false
     const abortController = { abort: () => { aborted = true } }
 
-    try {
-      // Calculate file hash
-      progress(true, 0, 100)  // Show indeterminate progress during hash calculation
-      const hash = await calculateFileHash(file)
+    // Retry helper function
+    const retryableUpload = async (retryCount = 0) => {
+      try {
+        // Calculate file hash (only once, not on retries)
+        if (retryCount === 0) {
+          progress(true, 0, 100)  // Show indeterminate progress during hash calculation
+          const hash = await calculateFileHash(file)
 
-      if (aborted) return abortController
+          if (aborted) return abortController
 
-      // Check if this hash already exists on server
-      const response = await checkHashes(projectId.value, [hash])
-      if (aborted) return abortController
+          // Check if this hash already exists on server
+          const response = await checkHashes(projectId.value, [hash])
+          if (aborted) return abortController
 
-      if (response.data.existing && response.data.existing.includes(hash)) {
-        // File already exists, skip upload
-        skippedFiles.value.push(file.name)
-        load('skipped')  // Mark as completed but skipped
-        return abortController
-      }
+          if (response.data.existing && response.data.existing.includes(hash)) {
+            // File already exists, skip upload
+            skippedFiles.value.push(file.name)
+            load('skipped')  // Mark as completed but skipped
+            return abortController
+          }
+        }
 
-      // Proceed with upload
-      const formData = new FormData()
-      formData.append('files', file)
+        // Proceed with upload
+        const formData = new FormData()
+        formData.append('files', file)
 
-      const token = localStorage.getItem('token')
-      const xhr = new XMLHttpRequest()
+        const token = localStorage.getItem('token')
+        const xhr = new XMLHttpRequest()
 
-      xhr.open('POST', `${getUploadUrl()}/api/admin/projects/${projectId.value}/photos`)
-      xhr.setRequestHeader('Authorization', `Bearer ${token}`)
+        xhr.open('POST', `${getUploadUrl()}/api/admin/projects/${projectId.value}/photos`)
+        xhr.setRequestHeader('Authorization', `Bearer ${token}`)
 
-      xhr.upload.onprogress = (e) => {
-        progress(e.lengthComputable, e.loaded, e.total)
-      }
+        xhr.upload.onprogress = (e) => {
+          progress(e.lengthComputable, e.loaded, e.total)
+        }
 
-      xhr.onload = () => {
-        if (xhr.status >= 200 && xhr.status < 300) {
-          uploadedCount.value++
-          load(xhr.responseText)
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            uploadedCount.value++
+            load(xhr.responseText)
+          } else {
+            // Retry on failure
+            if (retryCount < MAX_RETRIES && !aborted) {
+              console.log(`Retrying upload for ${file.name} (attempt ${retryCount + 1}/${MAX_RETRIES})`)
+              setTimeout(() => retryableUpload(retryCount + 1), RETRY_DELAY)
+            } else {
+              failedFiles.value.push(file.name)
+              error(`Upload failed after ${MAX_RETRIES} retries`)
+            }
+          }
+        }
+
+        xhr.onerror = () => {
+          // Retry on network error
+          if (retryCount < MAX_RETRIES && !aborted) {
+            console.log(`Network error, retrying ${file.name} (attempt ${retryCount + 1}/${MAX_RETRIES})`)
+            setTimeout(() => retryableUpload(retryCount + 1), RETRY_DELAY)
+          } else {
+            failedFiles.value.push(file.name)
+            error(`Network error after ${MAX_RETRIES} retries`)
+          }
+        }
+
+        abortController.abort = () => {
+          xhr.abort()
+          abort()
+        }
+
+        xhr.send(formData)
+      } catch (err) {
+        if (retryCount < MAX_RETRIES && !aborted) {
+          console.log(`Error during upload, retrying ${file.name} (attempt ${retryCount + 1}/${MAX_RETRIES})`)
+          setTimeout(() => retryableUpload(retryCount + 1), RETRY_DELAY)
         } else {
           failedFiles.value.push(file.name)
           error('Upload failed')
         }
       }
-
-      xhr.onerror = () => {
-        failedFiles.value.push(file.name)
-        error('Network error')
-      }
-
-      abortController.abort = () => {
-        xhr.abort()
-        abort()
-      }
-
-      xhr.send(formData)
-    } catch (err) {
-      failedFiles.value.push(file.name)
-      error('Hash check failed')
     }
 
+    await retryableUpload()
     return abortController
   }
 }))
 
 // FilePond accepted file types
-const acceptedFileTypes = [
-  'image/*',
-  'image/x-canon-cr2',
-  'image/x-canon-cr3',
-  'image/x-nikon-nef',
-  'image/x-sony-arw',
-  'image/x-adobe-dng',
-  'image/x-olympus-orf',
-  'image/x-panasonic-rw2',
-  'image/x-pentax-pef',
-  'image/x-fuji-raf',
-  'image/x-samsung-srw',
-  'image/x-sigma-x3f'
-]
+// Note: RAW files are often detected as 'application/octet-stream' by browsers
+// so we need to accept all file types and let the backend validate
+const acceptedFileTypes = null  // null = accept all file types
 
 // Calculate SHA-256 hash of a file using chunked streaming to avoid memory spikes
 // This prevents loading entire 60MB RAW files into memory at once
@@ -569,8 +582,11 @@ function toggleExclusion(photoId) {
               :allow-reorder="true"
               :server="filePondServer"
               :accepted-file-types="acceptedFileTypes"
-              :max-parallel-uploads="3"
+              :max-parallel-uploads="2"
+              :max-files="100"
               :instant-upload="true"
+              :allow-image-preview="false"
+              :image-preview-height="0"
               credits=""
               @init="handleFilePondInit"
               @processfiles="handleProcessFiles"
