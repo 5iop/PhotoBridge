@@ -11,6 +11,7 @@ import (
 	"photobridge/config"
 	"photobridge/database"
 	"photobridge/models"
+	"photobridge/services"
 	"photobridge/utils"
 
 	"github.com/gin-gonic/gin"
@@ -149,6 +150,11 @@ func UploadPhotos(c *gin.Context) {
 			continue
 		}
 		uploadedPhotos = append(uploadedPhotos, *photo)
+
+		// Enqueue for thumbnail generation
+		if services.Queue != nil && photo.NormalExt != "" {
+			services.Queue.Enqueue(photo, project.Name)
+		}
 	}
 
 	response := gin.H{
@@ -191,12 +197,17 @@ func UploadViaAPI(c *gin.Context) {
 	var failedFiles []string
 
 	for _, file := range files {
-		_, err := processUploadedFile(c, file, &project, uploadDir)
+		photo, err := processUploadedFile(c, file, &project, uploadDir)
 		if err != nil {
 			failedFiles = append(failedFiles, filepath.Base(file.Filename))
 			continue
 		}
 		uploadedCount++
+
+		// Enqueue for thumbnail generation
+		if services.Queue != nil && photo.NormalExt != "" {
+			services.Queue.Enqueue(photo, project.Name)
+		}
 	}
 
 	response := gin.H{

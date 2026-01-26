@@ -10,6 +10,7 @@ import (
 	"photobridge/database"
 	"photobridge/handlers"
 	"photobridge/middleware"
+	"photobridge/services"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -26,8 +27,18 @@ func main() {
 	// Initialize database
 	database.Init()
 
+	// Initialize thumbnail generation queue
+	// Workers: 2 (concurrent thumbnail generators)
+	// Queue is unbounded - tasks only store file paths, not image data
+	services.InitQueue(2)
+
 	// Create Gin router
 	r := gin.Default()
+
+	// Set max memory for multipart forms to 8MB
+	// Files larger than this will be stored in temp files on disk
+	// This prevents large uploads from consuming too much RAM
+	r.MaxMultipartMemory = 8 << 20 // 8 MB
 
 	// Configure CORS
 	r.Use(cors.New(cors.Config{

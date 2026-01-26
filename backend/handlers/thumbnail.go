@@ -1,61 +1,15 @@
 package handlers
 
 import (
-	"log"
 	"net/http"
-	"path/filepath"
 	"strconv"
-	"sync"
 
-	"photobridge/config"
 	"photobridge/database"
 	"photobridge/models"
-	"photobridge/utils"
+	"photobridge/services"
 
 	"github.com/gin-gonic/gin"
 )
-
-// 用于防止同一张照片的缩略图同时生成（竞态条件）
-var thumbGenerating sync.Map
-
-// 异步生成缩略图（带竞态条件保护）
-func generateThumbsAsync(photo *models.Photo, projectName string) {
-	photoID := photo.ID
-
-	// 检查是否已经在生成中
-	if _, loaded := thumbGenerating.LoadOrStore(photoID, true); loaded {
-		log.Printf("Thumbnail generation already in progress for photo %d", photoID)
-		return
-	}
-
-	go func() {
-		// 完成后清除标记
-		defer thumbGenerating.Delete(photoID)
-
-		if photo.NormalExt == "" {
-			return // 只有RAW，不生成缩略图
-		}
-
-		imagePath := filepath.Join(config.AppConfig.UploadDir, projectName, photo.BaseName+photo.NormalExt)
-		thumbResult, err := utils.GenerateThumbnails(imagePath)
-		if err != nil {
-			log.Printf("Async thumbnail generation failed for photo %d: %v", photoID, err)
-			return
-		}
-
-		// 更新数据库
-		if err := database.DB.Model(&models.Photo{}).Where("id = ?", photoID).Updates(map[string]interface{}{
-			"thumb_small":  thumbResult.Small,
-			"thumb_large":  thumbResult.Large,
-			"thumb_width":  thumbResult.Width,
-			"thumb_height": thumbResult.Height,
-		}).Error; err != nil {
-			log.Printf("Failed to save thumbnail for photo %d: %v", photoID, err)
-			return
-		}
-		log.Printf("Async thumbnail generated for photo %d", photoID)
-	}()
-}
 
 // serveThumb is a unified handler for serving thumbnails
 // size: "small" or "large"
@@ -74,12 +28,21 @@ func serveThumb(c *gin.Context, photo *models.Photo, size string) {
 		thumbData = photo.ThumbLarge
 	}
 
-	// 如果没有缩略图，异步生成
+	// 如果没有缩略图，加入队列生成
 	if len(thumbData) == 0 {
 		var project models.Project
 		database.DB.First(&project, photo.ProjectID)
-		generateThumbsAsync(photo, project.Name)
-		c.JSON(http.StatusAccepted, gin.H{"error": "generating", "message": "正在生成缩略图"})
+
+		// 加入生成队列
+		if services.Queue != nil {
+			services.Queue.Enqueue(photo, project.Name)
+		}
+
+		c.JSON(http.StatusAccepted, gin.H{
+			"error":   "generating",
+			"message": "缩略图生成中，请稍后重试",
+			"queued":  services.Queue != nil && services.Queue.IsProcessing(photo.ID),
+		})
 		return
 	}
 
