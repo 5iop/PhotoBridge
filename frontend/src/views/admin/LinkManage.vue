@@ -160,7 +160,7 @@ function openCreateModal() {
 
       <!-- Empty state -->
       <div v-else-if="!links.length" class="text-center py-16">
-        <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-dark-300 mb-4">
+        <div class="inline-flex items-center justify-center w-16 h-16 rounded-xl bg-dark-300 mb-4">
           <svg class="w-8 h-8 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
           </svg>
