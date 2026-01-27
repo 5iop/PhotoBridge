@@ -594,7 +594,7 @@ function toggleExclusion(photoId) {
               :allow-reorder="true"
               :server="filePondServer"
               :accepted-file-types="acceptedFileTypes"
-              :max-parallel-uploads="2"
+              :max-parallel-uploads="3"
               :max-files="100"
               :instant-upload="true"
               :allow-image-preview="false"

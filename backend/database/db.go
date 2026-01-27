@@ -52,10 +52,15 @@ func Init() {
 		log.Fatalf("%s Failed to get database instance: %v", shortname, err)
 	}
 
-	// Enable WAL mode for better concurrency
+	// Enable WAL mode for better concurrency (allows concurrent reads)
 	log.Printf("%s Enabling WAL mode", shortname)
 	if _, err := sqlDB.Exec("PRAGMA journal_mode=WAL;"); err != nil {
 		log.Printf("%s Warning: Failed to enable WAL mode: %v", shortname, err)
+	}
+
+	// Set busy timeout to wait for locks instead of failing immediately
+	if _, err := sqlDB.Exec("PRAGMA busy_timeout=30000;"); err != nil {
+		log.Printf("%s Warning: Failed to set busy timeout: %v", shortname, err)
 	}
 
 	// Set synchronous mode to NORMAL for better performance
@@ -69,8 +74,10 @@ func Init() {
 	}
 
 	// Set connection pool settings
-	sqlDB.SetMaxOpenConns(1) // SQLite only supports 1 writer at a time
-	sqlDB.SetMaxIdleConns(1)
+	// WAL mode allows multiple readers with one writer
+	// More connections = better read concurrency
+	sqlDB.SetMaxOpenConns(10) // Allow multiple concurrent readers
+	sqlDB.SetMaxIdleConns(5)
 	log.Printf("%s Database optimization settings applied", shortname)
 
 	// Auto migrate models

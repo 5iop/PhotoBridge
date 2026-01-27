@@ -18,16 +18,9 @@ COPY frontend/ ./
 RUN npm run build
 
 # ============================================
-# Stage 2: Build Backend
+# Stage 2: Build Backend (Pure Go, no CGO)
 # ============================================
 FROM golang:1.21 AS backend-builder
-
-# Install build dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    gcc \
-    libc6-dev \
-    libsqlite3-dev \
-    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app/backend
 
@@ -40,8 +33,8 @@ RUN go mod download
 # Copy source files
 COPY backend/ ./
 
-# Build binary with optimizations
-RUN CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build \
+# Build static binary without CGO (pure Go SQLite)
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
     -ldflags="-w -s" \
     -o photobridge \
     .
@@ -55,8 +48,6 @@ FROM ubuntu:22.04
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     tzdata \
-    sqlite3 \
-    vim \
     wget \
     && rm -rf /var/lib/apt/lists/*
 
@@ -67,6 +58,9 @@ COPY --from=backend-builder /app/backend/photobridge .
 
 # Copy frontend build from frontend builder
 COPY --from=frontend-builder /app/frontend/dist ./frontend/dist
+
+# Copy docs for Swagger UI
+COPY backend/docs ./docs
 
 # Create directories for data and uploads
 RUN mkdir -p /app/data /app/uploads
