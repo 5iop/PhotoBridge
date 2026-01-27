@@ -35,6 +35,8 @@ const editingLink = ref(null)
 const newAlias = ref('')
 const newAllowRaw = ref(true)
 const newExclusions = ref(new Set())
+const createdLink = ref(null)  // Store newly created link for copy
+const copySuccess = ref(false)  // Show copy success feedback
 
 // Photo preview with EXIF and files
 const previewPhoto = ref(null)
@@ -506,8 +508,12 @@ function getShareUrl(link) {
   return `${window.location.origin}/share/${link.token}`
 }
 
+const copiedLinkId = ref(null)  // Track which link was copied
+
 function copyLink(link) {
   navigator.clipboard.writeText(getShareUrl(link))
+  copiedLinkId.value = link.id
+  setTimeout(() => { copiedLinkId.value = null }, 2000)
 }
 
 function openCreateModal() {
@@ -515,6 +521,8 @@ function openCreateModal() {
   newAlias.value = ''
   newAllowRaw.value = true
   newExclusions.value = new Set()
+  createdLink.value = null
+  copySuccess.value = false
   showLinkModal.value = true
 }
 
@@ -535,12 +543,28 @@ async function saveLink() {
 
   if (editingLink.value) {
     await api.updateShareLink(editingLink.value.id, data)
+    showLinkModal.value = false
+    await fetchData()
   } else {
-    await api.createShareLink(projectId.value, data)
+    const res = await api.createShareLink(projectId.value, data)
+    createdLink.value = res.data
+    copySuccess.value = false
+    await fetchData()
   }
+}
 
+function copyCreatedLink() {
+  if (createdLink.value) {
+    navigator.clipboard.writeText(getShareUrl(createdLink.value))
+    copySuccess.value = true
+    setTimeout(() => { copySuccess.value = false }, 2000)
+  }
+}
+
+function closeCreateModal() {
   showLinkModal.value = false
-  await fetchData()
+  createdLink.value = null
+  copySuccess.value = false
 }
 
 async function deleteLink(link) {
@@ -717,9 +741,17 @@ function toggleExclusion(photoId) {
                     <p class="text-xs text-cf-muted font-mono truncate">/share/{{ link.token }}</p>
                   </div>
                   <div class="flex gap-1">
-                    <button @click="copyLink(link)" class="p-1.5 rounded hover:bg-gray-200 text-cf-muted hover:text-cf-text" title="复制链接">
-                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <button
+                      @click="copyLink(link)"
+                      class="p-1.5 rounded transition-colors"
+                      :class="copiedLinkId === link.id ? 'bg-green-100 text-green-600' : 'hover:bg-gray-200 text-cf-muted hover:text-cf-text'"
+                      :title="copiedLinkId === link.id ? '已复制' : '复制链接'"
+                    >
+                      <svg v-if="copiedLinkId !== link.id" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+                      </svg>
+                      <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
                       </svg>
                     </button>
                     <button @click="openEditModal(link)" class="p-1.5 rounded hover:bg-gray-200 text-cf-muted hover:text-cf-text" title="编辑">
@@ -925,58 +957,103 @@ function toggleExclusion(photoId) {
     <!-- Link Modal -->
     <div v-if="showLinkModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/30">
       <div class="card p-5 w-full max-w-lg max-h-[80vh] overflow-y-auto" @click.stop>
-        <h3 class="text-lg font-semibold text-cf-text mb-4">{{ editingLink ? '编辑链接' : '创建链接' }}</h3>
-
-        <div class="space-y-4">
-          <div>
-            <label class="label">链接名称</label>
-            <input v-model="newAlias" type="text" class="input" placeholder="客户名称" />
+        <!-- Success state after creating link -->
+        <template v-if="createdLink">
+          <div class="text-center">
+            <div class="w-12 h-12 mx-auto mb-3 rounded-full bg-green-100 flex items-center justify-center">
+              <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+            <h3 class="text-lg font-semibold text-cf-text mb-2">链接创建成功</h3>
+            <p class="text-sm text-cf-muted mb-4">{{ createdLink.alias || '未命名链接' }}</p>
           </div>
 
-          <div class="flex items-center gap-3">
-            <button @click="newAllowRaw = !newAllowRaw" class="relative w-10 h-5 rounded-full transition-colors" :class="newAllowRaw ? 'bg-primary-500' : 'bg-gray-200'">
-              <span class="absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform" :class="newAllowRaw ? 'left-5' : 'left-0.5'"></span>
-            </button>
-            <span class="text-sm text-cf-text">允许下载 RAW 文件</span>
-          </div>
-
-          <div>
-            <label class="label">隐藏的照片</label>
-            <div class="grid grid-cols-6 gap-1.5 max-h-48 overflow-y-auto p-1">
-              <div
-                v-for="photo in photos"
-                :key="photo.id"
-                class="aspect-square rounded overflow-hidden cursor-pointer relative"
-                :class="newExclusions.has(photo.id) ? 'ring-2 ring-red-500' : 'ring-1 ring-cf-border'"
-                @click="toggleExclusion(photo.id)"
+          <!-- Full URL with copy button -->
+          <div class="mb-4">
+            <label class="label">分享链接</label>
+            <div class="flex items-center gap-2">
+              <input
+                type="text"
+                :value="getShareUrl(createdLink)"
+                class="input flex-1 text-sm font-mono"
+                readonly
+                @focus="$event.target.select()"
+              />
+              <button
+                @click="copyCreatedLink"
+                class="btn flex-shrink-0 transition-colors"
+                :class="copySuccess ? 'btn-success' : 'btn-primary'"
               >
-                <img v-if="photo.normal_ext && getThumbSmallUrl(photo)" :src="getThumbSmallUrl(photo)" class="w-full h-full object-cover" :class="newExclusions.has(photo.id) ? 'opacity-40' : ''" @error="handleThumbError($event, photo)" />
-                <div v-else-if="photo.normal_ext && isThumbError(photo)" class="w-full h-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors" @click.stop="retryThumbSmall(photo)">
-                  <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                  </svg>
-                </div>
-                <div v-else-if="photo.normal_ext && !getThumbSmallUrl(photo)" class="w-full h-full bg-gray-100 flex items-center justify-center">
-                  <svg class="w-4 h-4 text-gray-400 spinner" fill="none" viewBox="0 0 24 24">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-                  </svg>
-                </div>
-                <div v-else class="w-full h-full bg-gray-100 flex items-center justify-center text-[8px] text-cf-muted">只有RAW</div>
-                <div v-if="newExclusions.has(photo.id)" class="absolute inset-0 flex items-center justify-center">
-                  <svg class="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                  </svg>
+                <svg v-if="!copySuccess" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+                </svg>
+                <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                </svg>
+                {{ copySuccess ? '已复制' : '复制' }}
+              </button>
+            </div>
+          </div>
+
+          <button @click="closeCreateModal" class="btn btn-secondary w-full">完成</button>
+        </template>
+
+        <!-- Create/Edit form -->
+        <template v-else>
+          <h3 class="text-lg font-semibold text-cf-text mb-4">{{ editingLink ? '编辑链接' : '创建链接' }}</h3>
+
+          <div class="space-y-4">
+            <div>
+              <label class="label">链接名称</label>
+              <input v-model="newAlias" type="text" class="input" placeholder="客户名称" />
+            </div>
+
+            <div class="flex items-center gap-3">
+              <button @click="newAllowRaw = !newAllowRaw" class="relative w-10 h-5 rounded-full transition-colors" :class="newAllowRaw ? 'bg-primary-500' : 'bg-gray-200'">
+                <span class="absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform" :class="newAllowRaw ? 'left-5' : 'left-0.5'"></span>
+              </button>
+              <span class="text-sm text-cf-text">允许下载 RAW 文件</span>
+            </div>
+
+            <div>
+              <label class="label">隐藏的照片</label>
+              <div class="grid grid-cols-6 gap-1.5 max-h-48 overflow-y-auto p-1">
+                <div
+                  v-for="photo in photos"
+                  :key="photo.id"
+                  class="aspect-square rounded overflow-hidden cursor-pointer relative"
+                  :class="newExclusions.has(photo.id) ? 'ring-2 ring-red-500' : 'ring-1 ring-cf-border'"
+                  @click="toggleExclusion(photo.id)"
+                >
+                  <img v-if="photo.normal_ext && getThumbSmallUrl(photo)" :src="getThumbSmallUrl(photo)" class="w-full h-full object-cover" :class="newExclusions.has(photo.id) ? 'opacity-40' : ''" @error="handleThumbError($event, photo)" />
+                  <div v-else-if="photo.normal_ext && isThumbError(photo)" class="w-full h-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors" @click.stop="retryThumbSmall(photo)">
+                    <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                  </div>
+                  <div v-else-if="photo.normal_ext && !getThumbSmallUrl(photo)" class="w-full h-full bg-gray-100 flex items-center justify-center">
+                    <svg class="w-4 h-4 text-gray-400 spinner" fill="none" viewBox="0 0 24 24">
+                      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                    </svg>
+                  </div>
+                  <div v-else class="w-full h-full bg-gray-100 flex items-center justify-center text-[8px] text-cf-muted">只有RAW</div>
+                  <div v-if="newExclusions.has(photo.id)" class="absolute inset-0 flex items-center justify-center">
+                    <svg class="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
-        </div>
 
-        <div class="flex gap-3 mt-5">
-          <button @click="showLinkModal = false" class="btn btn-secondary flex-1">取消</button>
-          <button @click="saveLink" class="btn btn-primary flex-1">{{ editingLink ? '保存' : '创建' }}</button>
-        </div>
+          <div class="flex gap-3 mt-5">
+            <button @click="closeCreateModal" class="btn btn-secondary flex-1">取消</button>
+            <button @click="saveLink" class="btn btn-primary flex-1">{{ editingLink ? '保存' : '创建' }}</button>
+          </div>
+        </template>
       </div>
     </div>
   </div>
