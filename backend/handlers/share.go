@@ -17,12 +17,13 @@ import (
 )
 
 type ShareInfoResponse struct {
-	ProjectName  string `json:"project_name"`
-	Description  string `json:"description"`
-	Alias        string `json:"alias"`
-	AllowRaw     bool   `json:"allow_raw"`
-	PhotoCount   int    `json:"photo_count"`
-	CDNBaseURL   string `json:"cdn_base_url,omitempty"` // CDN base URL for China users
+	ProjectName  string  `json:"project_name"`
+	Description  string  `json:"description"`
+	Alias        string  `json:"alias"`
+	AllowRaw     bool    `json:"allow_raw"`
+	PhotoCount   int     `json:"photo_count"`
+	CDNBaseURL   string  `json:"cdn_base_url"`           // CDN base URL for China users, empty if not applicable
+	Country      *string `json:"country"`                // Client's country code from CF-IPCountry header, null if not available
 }
 
 func GetShareInfo(c *gin.Context) {
@@ -51,6 +52,12 @@ func GetShareInfo(c *gin.Context) {
 	}
 	query.Count(&photoCount)
 
+	// Get country from CF-IPCountry header
+	var country *string
+	if countryHeader := c.GetHeader("CF-IPCountry"); countryHeader != "" {
+		country = &countryHeader
+	}
+
 	c.JSON(http.StatusOK, ShareInfoResponse{
 		ProjectName: project.Name,
 		Description: project.Description,
@@ -58,6 +65,7 @@ func GetShareInfo(c *gin.Context) {
 		AllowRaw:    link.AllowRaw,
 		PhotoCount:  int(photoCount),
 		CDNBaseURL:  utils.GetCDNBaseURL(c),
+		Country:     country,
 	})
 }
 
@@ -169,24 +177,25 @@ func GetSharePhoto(c *gin.Context) {
 		filePath = filepath.Join(config.AppConfig.UploadDir, project.Name, photo.BaseName+photo.NormalExt)
 	}
 
-	if _, err := os.Stat(filePath); os.IsNotExist(err) {
+	// Open file for ServeContent (handles ETag, If-None-Match, 304, Range requests)
+	file, err := os.Open(filePath)
+	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "File not found"})
 		return
 	}
+	defer file.Close()
 
-	// Generate and set ETag for the file
-	if etag, err := utils.GenerateFileETag(filePath); err == nil {
-		c.Header("ETag", etag)
-		c.Header("Cache-Control", "public, max-age=31536000")
-
-		// Check if client has fresh cache
-		if utils.CheckETag(c, etag) {
-			c.Status(http.StatusNotModified)
-			return
-		}
+	fileInfo, err := file.Stat()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to read file info"})
+		return
 	}
 
-	c.File(filePath)
+	// Set cache headers
+	c.Header("Cache-Control", "public, max-age=31536000")
+
+	// ServeContent automatically handles ETag, If-None-Match, 304, and Range requests
+	http.ServeContent(c.Writer, c.Request, fileInfo.Name(), fileInfo.ModTime(), file)
 }
 
 // DownloadSinglePhoto - download a single photo with all its files (normal + raw) as zip
@@ -250,19 +259,25 @@ func DownloadSinglePhoto(c *gin.Context) {
 
 	// If only one file, send directly without zip
 	if len(files) == 1 {
-		// Generate and set ETag for the file
-		if etag, err := utils.GenerateFileETag(files[0]); err == nil {
-			c.Header("ETag", etag)
-			c.Header("Cache-Control", "public, max-age=31536000")
+		// Open file for ServeContent (handles ETag, If-None-Match, 304, Range requests)
+		file, err := os.Open(files[0])
+		if err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "File not found"})
+			return
+		}
+		defer file.Close()
 
-			// Check if client has fresh cache
-			if utils.CheckETag(c, etag) {
-				c.Status(http.StatusNotModified)
-				return
-			}
+		fileInfo, err := file.Stat()
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to read file info"})
+			return
 		}
 
-		c.File(files[0])
+		// Set cache headers
+		c.Header("Cache-Control", "public, max-age=31536000")
+
+		// ServeContent automatically handles ETag, If-None-Match, 304, and Range requests
+		http.ServeContent(c.Writer, c.Request, fileInfo.Name(), fileInfo.ModTime(), file)
 		return
 	}
 

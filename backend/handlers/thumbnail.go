@@ -54,8 +54,8 @@ func serveThumb(c *gin.Context, photo *models.Photo, size string) {
 	c.Header("ETag", etag)
 	c.Header("Cache-Control", "public, max-age=31536000")
 
-	// Check if client has fresh cache
-	if utils.CheckETag(c, etag) {
+	// Check if client has fresh cache (If-None-Match header)
+	if clientETag := c.GetHeader("If-None-Match"); clientETag != "" && clientETag == etag {
 		c.Status(http.StatusNotModified)
 		return
 	}
