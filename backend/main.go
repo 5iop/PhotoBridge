@@ -141,8 +141,9 @@ func main() {
 	}
 
 	// Start server
-	log.Printf("%s Server starting on port %s", shortname, config.AppConfig.Port)
-	log.Printf("%s Access the application at http://localhost:%s", shortname, config.AppConfig.Port)
+	log.Printf("%s Server starting on 0.0.0.0:%s (all interfaces)", shortname, config.AppConfig.Port)
+	log.Printf("%s Local access: http://localhost:%s", shortname, config.AppConfig.Port)
+	log.Printf("%s Network access: http://<your-ip>:%s", shortname, config.AppConfig.Port)
 	if err := r.Run(":" + config.AppConfig.Port); err != nil {
 		log.Fatalf("%s Failed to start server: %v", shortname, err)
 	}
