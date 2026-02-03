@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strconv"
 
+	"photobridge/common"
 	"photobridge/config"
 	"photobridge/database"
 	"photobridge/models"
@@ -30,21 +31,22 @@ func GetShareInfo(c *gin.Context) {
 	token := c.Param("token")
 	var link models.ShareLink
 
-	result := database.DB.Where("token = ?", token).Preload("Exclusions").First(&link)
+	result := database.DB.Where("token = ?", token).Preload("Exclusions").Preload("Project").First(&link)
 	if result.Error != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Share link not found"})
 		return
 	}
 
-	var project models.Project
-	database.DB.First(&project, link.ProjectID)
+	project := link.Project
+	// Check if project exists (Preload doesn't fail if foreign key references non-existent record)
+	if project.ID == 0 {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Project not found"})
+		return
+	}
 
 	// Get photo count (excluding excluded photos)
 	var photoCount int64
-	excludedIDs := make([]uint, len(link.Exclusions))
-	for i, e := range link.Exclusions {
-		excludedIDs[i] = e.PhotoID
-	}
+	excludedIDs := common.GetExcludedIDs(link.Exclusions)
 
 	query := database.DB.Model(&models.Photo{}).Where("project_id = ?", link.ProjectID)
 	if len(excludedIDs) > 0 {
@@ -73,20 +75,21 @@ func GetSharePhotos(c *gin.Context) {
 	token := c.Param("token")
 	var link models.ShareLink
 
-	result := database.DB.Where("token = ?", token).Preload("Exclusions").First(&link)
+	result := database.DB.Where("token = ?", token).Preload("Exclusions").Preload("Project").First(&link)
 	if result.Error != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Share link not found"})
 		return
 	}
 
-	var project models.Project
-	database.DB.First(&project, link.ProjectID)
+	project := link.Project
+	// Check if project exists (Preload doesn't fail if foreign key references non-existent record)
+	if project.ID == 0 {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Project not found"})
+		return
+	}
 
 	// Get photos excluding excluded ones
-	excludedIDs := make([]uint, len(link.Exclusions))
-	for i, e := range link.Exclusions {
-		excludedIDs[i] = e.PhotoID
-	}
+	excludedIDs := common.GetExcludedIDs(link.Exclusions)
 
 	var photos []models.Photo
 	query := database.DB.Where("project_id = ?", link.ProjectID)
@@ -136,16 +139,21 @@ func GetSharePhoto(c *gin.Context) {
 	}
 
 	var link models.ShareLink
-	result := database.DB.Where("token = ?", token).First(&link)
+	result := database.DB.Where("token = ?", token).Preload("Project").First(&link)
 	if result.Error != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Share link not found"})
 		return
 	}
 
+	project := link.Project
+	// Check if project exists (Preload doesn't fail if foreign key references non-existent record)
+	if project.ID == 0 {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Project not found"})
+		return
+	}
+
 	// Check if photo is excluded (optimized: direct query instead of loading all exclusions)
-	var exclusionCount int64
-	database.DB.Model(&models.PhotoExclusion{}).Where("link_id = ? AND photo_id = ?", link.ID, photoIDUint).Count(&exclusionCount)
-	if exclusionCount > 0 {
+	if common.IsPhotoExcluded(link.ID, uint(photoIDUint)) {
 		c.JSON(http.StatusForbidden, gin.H{"error": "Photo not accessible"})
 		return
 	}
@@ -157,11 +165,8 @@ func GetSharePhoto(c *gin.Context) {
 		return
 	}
 
-	var project models.Project
-	database.DB.First(&project, photo.ProjectID)
-
 	// 验证项目名称安全性（虽然来自数据库，但做额外验证）
-	if _, valid := utils.SanitizeProjectName(project.Name); !valid {
+	if !utils.ValidatePathComponent(project.Name) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid project configuration"})
 		return
 	}
@@ -177,8 +182,15 @@ func GetSharePhoto(c *gin.Context) {
 		filePath = filepath.Join(config.AppConfig.UploadDir, project.Name, photo.BaseName+photo.NormalExt)
 	}
 
+	// Validate file path is secure before opening
+	safeFilePath, err := utils.ValidateSecurePath(config.AppConfig.UploadDir, filePath)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid file path"})
+		return
+	}
+
 	// Open file for ServeContent (handles ETag, If-None-Match, 304, Range requests)
-	file, err := os.Open(filePath)
+	file, err := os.Open(safeFilePath)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "File not found"})
 		return
@@ -210,16 +222,21 @@ func DownloadSinglePhoto(c *gin.Context) {
 	}
 
 	var link models.ShareLink
-	result := database.DB.Where("token = ?", token).First(&link)
+	result := database.DB.Where("token = ?", token).Preload("Project").First(&link)
 	if result.Error != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Share link not found"})
 		return
 	}
 
+	project := link.Project
+	// Check if project exists (Preload doesn't fail if foreign key references non-existent record)
+	if project.ID == 0 {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Project not found"})
+		return
+	}
+
 	// Check if photo is excluded (optimized: direct query instead of loading all exclusions)
-	var exclusionCount int64
-	database.DB.Model(&models.PhotoExclusion{}).Where("link_id = ? AND photo_id = ?", link.ID, photoIDUint).Count(&exclusionCount)
-	if exclusionCount > 0 {
+	if common.IsPhotoExcluded(link.ID, uint(photoIDUint)) {
 		c.JSON(http.StatusForbidden, gin.H{"error": "Photo not accessible"})
 		return
 	}
@@ -230,15 +247,26 @@ func DownloadSinglePhoto(c *gin.Context) {
 		return
 	}
 
-	var project models.Project
-	database.DB.First(&project, photo.ProjectID)
+	// Validate project name to prevent directory traversal
+	if !utils.ValidatePathComponent(project.Name) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid project name"})
+		return
+	}
 
 	uploadDir := filepath.Join(config.AppConfig.UploadDir, project.Name)
+
+	// Validate upload directory path is secure
+	safeUploadDir, err := utils.ValidateSecurePath(config.AppConfig.UploadDir, uploadDir)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid directory path"})
+		return
+	}
+
 	var files []string
 
 	// Add normal photo
 	if photo.NormalExt != "" {
-		filePath := filepath.Join(uploadDir, photo.BaseName+photo.NormalExt)
+		filePath := filepath.Join(safeUploadDir, photo.BaseName+photo.NormalExt)
 		if _, err := os.Stat(filePath); err == nil {
 			files = append(files, filePath)
 		}
@@ -246,7 +274,7 @@ func DownloadSinglePhoto(c *gin.Context) {
 
 	// Add RAW if allowed
 	if photo.HasRaw && photo.RawExt != "" && link.AllowRaw {
-		filePath := filepath.Join(uploadDir, photo.BaseName+photo.RawExt)
+		filePath := filepath.Join(safeUploadDir, photo.BaseName+photo.RawExt)
 		if _, err := os.Stat(filePath); err == nil {
 			files = append(files, filePath)
 		}
@@ -286,8 +314,11 @@ func DownloadSinglePhoto(c *gin.Context) {
 	c.Header("Content-Type", "application/zip")
 	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", zipName))
 
-	if err := utils.CreateZip(c.Writer, files, uploadDir); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create zip"})
+	// Note: HTTP headers are already sent at this point. If CreateZip fails,
+	// the client will receive an incomplete/malformed zip file.
+	// This is acceptable as pre-validating all files would be expensive.
+	if err := utils.CreateZip(c.Writer, files, safeUploadDir); err != nil {
+		// Cannot send error response - headers already sent
 		return
 	}
 }
@@ -297,20 +328,27 @@ func DownloadSharePhotos(c *gin.Context) {
 	downloadType := c.DefaultQuery("type", "normal") // normal, raw, or all
 
 	var link models.ShareLink
-	result := database.DB.Where("token = ?", token).Preload("Exclusions").First(&link)
+	result := database.DB.Where("token = ?", token).Preload("Exclusions").Preload("Project").First(&link)
 	if result.Error != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Share link not found"})
 		return
 	}
 
-	var project models.Project
-	database.DB.First(&project, link.ProjectID)
+	project := link.Project
+	// Check if project exists (Preload doesn't fail if foreign key references non-existent record)
+	if project.ID == 0 {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Project not found"})
+		return
+	}
+
+	// Validate project name to prevent directory traversal
+	if !utils.ValidatePathComponent(project.Name) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid project name"})
+		return
+	}
 
 	// Get photos excluding excluded ones
-	excludedIDs := make([]uint, len(link.Exclusions))
-	for i, e := range link.Exclusions {
-		excludedIDs[i] = e.PhotoID
-	}
+	excludedIDs := common.GetExcludedIDs(link.Exclusions)
 
 	var photos []models.Photo
 	query := database.DB.Where("project_id = ?", link.ProjectID)
@@ -321,12 +359,20 @@ func DownloadSharePhotos(c *gin.Context) {
 
 	// Collect files to zip
 	uploadDir := filepath.Join(config.AppConfig.UploadDir, project.Name)
+
+	// Validate upload directory path is secure
+	safeUploadDir, err := utils.ValidateSecurePath(config.AppConfig.UploadDir, uploadDir)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid directory path"})
+		return
+	}
+
 	var files []string
 
 	for _, photo := range photos {
 		if downloadType == "normal" || downloadType == "all" {
 			if photo.NormalExt != "" {
-				filePath := filepath.Join(uploadDir, photo.BaseName+photo.NormalExt)
+				filePath := filepath.Join(safeUploadDir, photo.BaseName+photo.NormalExt)
 				if _, err := os.Stat(filePath); err == nil {
 					files = append(files, filePath)
 				}
@@ -334,7 +380,7 @@ func DownloadSharePhotos(c *gin.Context) {
 		}
 		if (downloadType == "raw" || downloadType == "all") && link.AllowRaw {
 			if photo.HasRaw && photo.RawExt != "" {
-				filePath := filepath.Join(uploadDir, photo.BaseName+photo.RawExt)
+				filePath := filepath.Join(safeUploadDir, photo.BaseName+photo.RawExt)
 				if _, err := os.Stat(filePath); err == nil {
 					files = append(files, filePath)
 				}
@@ -352,10 +398,13 @@ func DownloadSharePhotos(c *gin.Context) {
 	c.Header("Content-Type", "application/zip")
 	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", zipName))
 
+	// Note: HTTP headers are already sent at this point. If CreateZip fails,
+	// the client will receive an incomplete/malformed zip file.
+	// This is acceptable as pre-validating all files would be expensive.
 	// Stream zip
-	err := utils.CreateZip(c.Writer, files, uploadDir)
+	err = utils.CreateZip(c.Writer, files, safeUploadDir)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create zip"})
+		// Cannot send error response - headers already sent
 		return
 	}
 }

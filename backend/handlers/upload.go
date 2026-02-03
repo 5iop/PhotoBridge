@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"photobridge/common"
 	"photobridge/config"
 	"photobridge/database"
 	"photobridge/models"
@@ -50,8 +51,30 @@ func processUploadedFile(c *gin.Context, file *multipart.FileHeader, project *mo
 	// Save file with lowercase extension for consistency
 	newFilename := baseName + ext
 	dst := filepath.Join(uploadDir, newFilename)
-	if err := c.SaveUploadedFile(file, dst); err != nil {
+
+	// Validate destination path is secure
+	safeDst, err := utils.ValidateSecurePath(config.AppConfig.UploadDir, dst)
+	if err != nil {
+		return nil, fmt.Errorf("invalid file path: %w", err)
+	}
+
+	if err := c.SaveUploadedFile(file, safeDst); err != nil {
 		return nil, err
+	}
+
+	// Validate file type by magic number
+	if isRaw {
+		// Validate RAW file (more permissive due to variety of formats)
+		if err := utils.ValidateRAWFile(safeDst); err != nil {
+			os.Remove(safeDst) // Clean up invalid file
+			return nil, fmt.Errorf("invalid RAW file: %w", err)
+		}
+	} else {
+		// Validate normal image file with strict magic number checking
+		if _, err := utils.ValidateImageFile(safeDst, nil); err != nil {
+			os.Remove(safeDst) // Clean up invalid file
+			return nil, fmt.Errorf("invalid image file: %w", err)
+		}
 	}
 
 	// Check if photo with same base name exists
@@ -116,13 +139,25 @@ func prepareUpload(c *gin.Context, project *models.Project) ([]*multipart.FileHe
 		return nil, "", fmt.Errorf("no files uploaded")
 	}
 
+	// Validate project name for path safety
+	if !utils.ValidatePathComponent(project.Name) {
+		return nil, "", fmt.Errorf("invalid project name")
+	}
+
 	// Create project upload directory
 	uploadDir := filepath.Join(config.AppConfig.UploadDir, project.Name)
-	if err := os.MkdirAll(uploadDir, 0755); err != nil {
+
+	// Validate the upload directory path is secure
+	safeUploadDir, err := utils.ValidateSecurePath(config.AppConfig.UploadDir, uploadDir)
+	if err != nil {
+		return nil, "", fmt.Errorf("invalid upload directory path: %w", err)
+	}
+
+	if err := os.MkdirAll(safeUploadDir, 0755); err != nil {
 		return nil, "", fmt.Errorf("failed to create upload directory")
 	}
 
-	return files, uploadDir, nil
+	return files, safeUploadDir, nil
 }
 
 func UploadPhotos(c *gin.Context) {
@@ -257,8 +292,7 @@ func GetProjectsViaAPI(c *gin.Context) {
 
 	var response []ProjectInfo
 	for _, p := range projects {
-		var count int64
-		database.DB.Model(&models.Photo{}).Where("project_id = ?", p.ID).Count(&count)
+		count := common.CountPhotosInProject(p.ID)
 		response = append(response, ProjectInfo{
 			ID:          p.ID,
 			Name:        p.Name,
@@ -397,8 +431,7 @@ func DeleteProjectViaAPI(c *gin.Context) {
 	}
 
 	// Check if project has photos
-	var photoCount int64
-	database.DB.Model(&models.Photo{}).Where("project_id = ?", project.ID).Count(&photoCount)
+	photoCount := common.CountPhotosInProject(project.ID)
 	if photoCount > 0 {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error":       "Project has photos, delete all photos first",
@@ -420,9 +453,14 @@ func DeleteProjectViaAPI(c *gin.Context) {
 	// Delete project
 	database.DB.Delete(&project)
 
-	// Delete upload directory
+	// Delete upload directory with security validation
 	uploadDir := filepath.Join(config.AppConfig.UploadDir, project.Name)
-	os.RemoveAll(uploadDir)
+	safeUploadDir, err := utils.ValidateSecurePath(config.AppConfig.UploadDir, uploadDir)
+	if err == nil {
+		// Only delete if path validation succeeds
+		os.RemoveAll(safeUploadDir)
+	}
+	// If validation fails, silently skip deletion to avoid errors during project cleanup
 
 	c.JSON(http.StatusOK, gin.H{
 		"message": fmt.Sprintf("Project '%s' deleted successfully", project.Name),

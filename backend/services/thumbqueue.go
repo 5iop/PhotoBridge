@@ -104,11 +104,25 @@ func (q *ThumbQueue) processTask(task ThumbTask) {
 		return // Only RAW, skip
 	}
 
+	// Validate project name for path safety
+	if !utils.ValidatePathComponent(task.ProjectName) {
+		log.Printf("%s Invalid project name for photo %d: %s", shortname, task.PhotoID, task.ProjectName)
+		return
+	}
+
 	// Generate thumbnail from file path (not from memory)
 	imagePath := filepath.Join(config.AppConfig.UploadDir, task.ProjectName, task.BaseName+task.NormalExt)
-	thumbResult, err := utils.GenerateThumbnails(imagePath)
+
+	// Validate the image path is secure
+	safeImagePath, err := utils.ValidateSecurePath(config.AppConfig.UploadDir, imagePath)
 	if err != nil {
-		log.Printf("%s Failed to generate thumbnail for photo %d (%s): %v", shortname, task.PhotoID, imagePath, err)
+		log.Printf("%s Invalid file path for photo %d: %v", shortname, task.PhotoID, err)
+		return
+	}
+
+	thumbResult, err := utils.GenerateThumbnails(safeImagePath)
+	if err != nil {
+		log.Printf("%s Failed to generate thumbnail for photo %d (%s): %v", shortname, task.PhotoID, safeImagePath, err)
 		return
 	}
 

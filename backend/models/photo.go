@@ -8,14 +8,14 @@ import (
 
 type Photo struct {
 	ID            uint           `gorm:"primarykey" json:"id"`
-	ProjectID     uint           `gorm:"index;not null" json:"project_id"`
+	ProjectID     uint           `gorm:"index;index:idx_project_file_hash,priority:1;index:idx_project_normal_hash,priority:1;index:idx_project_raw_hash,priority:1;not null" json:"project_id"`
 	BaseName      string         `gorm:"size:255;not null" json:"base_name"`
 	NormalExt     string         `gorm:"size:10" json:"normal_ext"`
 	RawExt        string         `gorm:"size:10" json:"raw_ext"`
 	HasRaw        bool           `gorm:"default:false" json:"has_raw"`
-	FileHash      string         `gorm:"size:64;index" json:"file_hash,omitempty"`    // SHA-256 hash for normal image (kept for backward compatibility)
-	NormalHash    string         `gorm:"size:64;index" json:"normal_hash,omitempty"`  // SHA-256 hash for normal image
-	RawHash       string         `gorm:"size:64;index" json:"raw_hash,omitempty"`     // SHA-256 hash for RAW file
+	FileHash      string         `gorm:"size:64;index;index:idx_project_file_hash,priority:2" json:"file_hash,omitempty"`    // SHA-256 hash for normal image (kept for backward compatibility)
+	NormalHash    string         `gorm:"size:64;index;index:idx_project_normal_hash,priority:2" json:"normal_hash,omitempty"`  // SHA-256 hash for normal image
+	RawHash       string         `gorm:"size:64;index;index:idx_project_raw_hash,priority:2" json:"raw_hash,omitempty"`     // SHA-256 hash for RAW file
 	ThumbSmall    []byte         `gorm:"type:blob" json:"-"`                          // 列表缩略图 ~300px
 	ThumbLarge    []byte         `gorm:"type:blob" json:"-"`                          // 预览缩略图 ~1200px
 	ThumbWidth    int            `json:"thumb_width,omitempty"`                       // 缩略图宽度

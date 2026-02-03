@@ -32,7 +32,10 @@ func serveThumb(c *gin.Context, photo *models.Photo, size string) {
 	// 如果没有缩略图，加入队列生成
 	if len(thumbData) == 0 {
 		var project models.Project
-		database.DB.First(&project, photo.ProjectID)
+		if err := database.DB.First(&project, photo.ProjectID).Error; err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Project not found"})
+			return
+		}
 
 		// 加入生成队列
 		if services.Queue != nil {

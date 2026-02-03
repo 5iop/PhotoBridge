@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"photobridge/common"
 	"photobridge/config"
 	"photobridge/database"
 	"photobridge/middleware"
@@ -99,13 +100,28 @@ func GetProjects(c *gin.Context) {
 		PhotoCount int64 `json:"photo_count"`
 	}
 
+	// Batch query photo counts for all projects (避免 N+1 查询问题)
+	type CountResult struct {
+		ProjectID  uint
+		PhotoCount int64
+	}
+	var countResults []CountResult
+	database.DB.Model(&models.Photo{}).
+		Select("project_id, COUNT(*) as photo_count").
+		Group("project_id").
+		Scan(&countResults)
+
+	// Create map for O(1) lookup
+	countMap := make(map[uint]int64)
+	for _, cr := range countResults {
+		countMap[cr.ProjectID] = cr.PhotoCount
+	}
+
 	var response []ProjectWithCount
 	for _, p := range projects {
-		var count int64
-		database.DB.Model(&models.Photo{}).Where("project_id = ?", p.ID).Count(&count)
 		response = append(response, ProjectWithCount{
 			Project:    p,
-			PhotoCount: count,
+			PhotoCount: countMap[p.ID], // O(1) lookup, default 0 if not found
 		})
 	}
 
@@ -137,7 +153,9 @@ func GetProject(c *gin.Context) {
 	id := c.Param("id")
 	var project models.Project
 
-	result := database.DB.Preload("Photos").Preload("ShareLinks").First(&project, id)
+	// Only preload ShareLinks, not Photos (Photos can be huge with blob data)
+	// Photos should be fetched separately with pagination via GET /admin/projects/:id/photos
+	result := database.DB.Preload("ShareLinks").First(&project, id)
 	if result.Error != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Project not found"})
 		return
@@ -197,8 +215,7 @@ func DeleteProject(c *gin.Context) {
 	}
 
 	// 检查项目中是否还有照片
-	var photoCount int64
-	database.DB.Model(&models.Photo{}).Where("project_id = ?", id).Count(&photoCount)
+	photoCount := common.CountPhotosInProject(project.ID)
 	if photoCount > 0 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "请先删除项目中的所有照片"})
 		return
@@ -217,8 +234,13 @@ func DeleteProject(c *gin.Context) {
 
 	// 删除项目的物理文件目录（如果存在）
 	uploadDir := filepath.Join(config.AppConfig.UploadDir, project.Name)
-	if err := os.RemoveAll(uploadDir); err != nil {
-		// 日志记录但不影响响应，因为数据库已清理
+	// Validate path before deletion to prevent directory traversal
+	safeUploadDir, err := utils.ValidateSecurePath(config.AppConfig.UploadDir, uploadDir)
+	if err == nil {
+		// Only delete if path validation succeeds
+		if err := os.RemoveAll(safeUploadDir); err != nil {
+			// 日志记录但不影响响应，因为数据库已清理
+		}
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Project deleted"})

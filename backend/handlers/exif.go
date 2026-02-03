@@ -7,9 +7,11 @@ import (
 	"path/filepath"
 	"strconv"
 
+	"photobridge/common"
 	"photobridge/config"
 	"photobridge/database"
 	"photobridge/models"
+	"photobridge/utils"
 
 	"github.com/gin-gonic/gin"
 	"github.com/rwcarlsen/goexif/exif"
@@ -36,14 +38,6 @@ type ExifInfo struct {
 	Software      string `json:"software,omitempty"`
 	GPSLatitude   string `json:"gps_latitude,omitempty"`
 	GPSLongitude  string `json:"gps_longitude,omitempty"`
-}
-
-func getTagString(x *exif.Exif, tag exif.FieldName) string {
-	t, err := x.Get(tag)
-	if err != nil {
-		return ""
-	}
-	return t.String()
 }
 
 func getTagStringVal(x *exif.Exif, tag exif.FieldName) string {
@@ -91,25 +85,38 @@ func formatRational(tag *tiff.Tag) string {
 func parseExifFromPhoto(photo *models.Photo, projectName string) *exif.Exif {
 	var x *exif.Exif
 
+	// Validate project name for path safety
+	if !utils.ValidatePathComponent(projectName) {
+		return nil
+	}
+
 	// Try RAW file first if available
 	if photo.HasRaw && photo.RawExt != "" {
 		rawPath := filepath.Join(config.AppConfig.UploadDir, projectName, photo.BaseName+photo.RawExt)
-		if f, openErr := os.Open(rawPath); openErr == nil {
-			func() {
-				defer f.Close()
-				x, _ = exif.Decode(f)
-			}()
+		// Validate path is secure
+		safeRawPath, err := utils.ValidateSecurePath(config.AppConfig.UploadDir, rawPath)
+		if err == nil {
+			if f, openErr := os.Open(safeRawPath); openErr == nil {
+				func() {
+					defer f.Close()
+					x, _ = exif.Decode(f)
+				}()
+			}
 		}
 	}
 
 	// If RAW failed or not available, try normal image file
 	if x == nil && photo.NormalExt != "" {
 		normalPath := filepath.Join(config.AppConfig.UploadDir, projectName, photo.BaseName+photo.NormalExt)
-		if f, openErr := os.Open(normalPath); openErr == nil {
-			func() {
-				defer f.Close()
-				x, _ = exif.Decode(f)
-			}()
+		// Validate path is secure
+		safeNormalPath, err := utils.ValidateSecurePath(config.AppConfig.UploadDir, normalPath)
+		if err == nil {
+			if f, openErr := os.Open(safeNormalPath); openErr == nil {
+				func() {
+					defer f.Close()
+					x, _ = exif.Decode(f)
+				}()
+			}
 		}
 	}
 
@@ -256,9 +263,7 @@ func GetPhotoExif(c *gin.Context) {
 	}
 
 	// Check if photo is excluded (optimized: direct query instead of loading all exclusions)
-	var exclusionCount int64
-	database.DB.Model(&models.PhotoExclusion{}).Where("link_id = ? AND photo_id = ?", link.ID, photoIDUint).Count(&exclusionCount)
-	if exclusionCount > 0 {
+	if common.IsPhotoExcluded(link.ID, uint(photoIDUint)) {
 		c.JSON(http.StatusForbidden, gin.H{"error": "Photo not accessible"})
 		return
 	}
