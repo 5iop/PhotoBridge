@@ -50,6 +50,12 @@ async function fetchData() {
     ])
     info.value = infoRes.data
     photos.value = photosRes.data || []
+
+    // 如果启用了中国CDN，在控制台输出提示
+    if (info.value.cdn_base_url) {
+      console.log(`%c[PhotoBridge] 已启用中国CDN加速`, 'color: #10b981; font-weight: bold')
+      console.log(`CDN域名: ${info.value.cdn_base_url}`)
+    }
   } catch (err) {
     error.value = err.response?.data?.error || '加载失败'
   } finally {
@@ -58,18 +64,25 @@ async function fetchData() {
 }
 
 function getPhotoUrl(photo) {
+  // 如果normal_url已经是完整URL（包含CDN域名），直接使用
+  if (photo.normal_url?.startsWith('http://') || photo.normal_url?.startsWith('https://')) {
+    return photo.normal_url
+  }
+  // 否则拼接上基础URL
   return `${getUploadUrl()}${photo.normal_url}`
 }
 
 // 获取缩略图URL（带版本号用于重试时刷新）
 function getThumbSmallUrl(photo) {
-  const baseUrl = getShareThumbSmallUrl(token.value, photo.id)
+  const cdnBaseUrl = info.value?.cdn_base_url || ''
+  const baseUrl = getShareThumbSmallUrl(token.value, photo.id, cdnBaseUrl)
   const version = thumbVersions[photo.id] || 0
   return version > 0 ? `${baseUrl}?v=${version}` : baseUrl
 }
 
 function getThumbLargeUrl(photo) {
-  return getShareThumbLargeUrl(token.value, photo.id)
+  const cdnBaseUrl = info.value?.cdn_base_url || ''
+  return getShareThumbLargeUrl(token.value, photo.id, cdnBaseUrl)
 }
 
 // 检查缩略图是否加载失败

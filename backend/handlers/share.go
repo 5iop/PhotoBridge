@@ -17,11 +17,12 @@ import (
 )
 
 type ShareInfoResponse struct {
-	ProjectName string `json:"project_name"`
-	Description string `json:"description"`
-	Alias       string `json:"alias"`
-	AllowRaw    bool   `json:"allow_raw"`
-	PhotoCount  int    `json:"photo_count"`
+	ProjectName  string `json:"project_name"`
+	Description  string `json:"description"`
+	Alias        string `json:"alias"`
+	AllowRaw     bool   `json:"allow_raw"`
+	PhotoCount   int    `json:"photo_count"`
+	CDNBaseURL   string `json:"cdn_base_url,omitempty"` // CDN base URL for China users
 }
 
 func GetShareInfo(c *gin.Context) {
@@ -56,6 +57,7 @@ func GetShareInfo(c *gin.Context) {
 		Alias:       link.Alias,
 		AllowRaw:    link.AllowRaw,
 		PhotoCount:  int(photoCount),
+		CDNBaseURL:  utils.GetCDNBaseURL(c),
 	})
 }
 
@@ -92,6 +94,9 @@ func GetSharePhotos(c *gin.Context) {
 		RawURL    string `json:"raw_url,omitempty"`
 	}
 
+	// Get CDN base URL based on client's country (CF-IPCountry header)
+	cdnBase := utils.GetCDNBaseURL(c)
+
 	// URL编码项目名称，防止特殊字符问题
 	encodedProjectName := url.PathEscape(project.Name)
 
@@ -100,10 +105,10 @@ func GetSharePhotos(c *gin.Context) {
 		item := PhotoWithURL{Photo: photo}
 		encodedBaseName := url.PathEscape(photo.BaseName)
 		if photo.NormalExt != "" {
-			item.NormalURL = fmt.Sprintf("/uploads/%s/%s%s", encodedProjectName, encodedBaseName, photo.NormalExt)
+			item.NormalURL = fmt.Sprintf("%s/uploads/%s/%s%s", cdnBase, encodedProjectName, encodedBaseName, photo.NormalExt)
 		}
 		if photo.HasRaw && link.AllowRaw && photo.RawExt != "" {
-			item.RawURL = fmt.Sprintf("/uploads/%s/%s%s", encodedProjectName, encodedBaseName, photo.RawExt)
+			item.RawURL = fmt.Sprintf("%s/uploads/%s/%s%s", cdnBase, encodedProjectName, encodedBaseName, photo.RawExt)
 		}
 		response = append(response, item)
 	}
@@ -167,6 +172,18 @@ func GetSharePhoto(c *gin.Context) {
 	if _, err := os.Stat(filePath); os.IsNotExist(err) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "File not found"})
 		return
+	}
+
+	// Generate and set ETag for the file
+	if etag, err := utils.GenerateFileETag(filePath); err == nil {
+		c.Header("ETag", etag)
+		c.Header("Cache-Control", "public, max-age=31536000")
+
+		// Check if client has fresh cache
+		if utils.CheckETag(c, etag) {
+			c.Status(http.StatusNotModified)
+			return
+		}
 	}
 
 	c.File(filePath)
@@ -233,6 +250,18 @@ func DownloadSinglePhoto(c *gin.Context) {
 
 	// If only one file, send directly without zip
 	if len(files) == 1 {
+		// Generate and set ETag for the file
+		if etag, err := utils.GenerateFileETag(files[0]); err == nil {
+			c.Header("ETag", etag)
+			c.Header("Cache-Control", "public, max-age=31536000")
+
+			// Check if client has fresh cache
+			if utils.CheckETag(c, etag) {
+				c.Status(http.StatusNotModified)
+				return
+			}
+		}
+
 		c.File(files[0])
 		return
 	}

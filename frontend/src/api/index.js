@@ -74,8 +74,15 @@ export const getUploadUrl = () => {
 }
 
 // Thumbnail URLs (share routes don't need auth)
-export const getShareThumbSmallUrl = (token, photoId) => `${getUploadUrl()}/api/share/${token}/photo/${photoId}/thumb/small`
-export const getShareThumbLargeUrl = (token, photoId) => `${getUploadUrl()}/api/share/${token}/photo/${photoId}/thumb/large`
+// cdnBaseUrl: optional CDN base URL (from backend cdn_base_url field)
+export const getShareThumbSmallUrl = (token, photoId, cdnBaseUrl = '') => {
+  const baseUrl = cdnBaseUrl || getUploadUrl()
+  return `${baseUrl}/api/share/${token}/photo/${photoId}/thumb/small`
+}
+export const getShareThumbLargeUrl = (token, photoId, cdnBaseUrl = '') => {
+  const baseUrl = cdnBaseUrl || getUploadUrl()
+  return `${baseUrl}/api/share/${token}/photo/${photoId}/thumb/large`
+}
 
 // Admin thumbnail fetchers - return blob URLs with auth
 const thumbCache = new Map()

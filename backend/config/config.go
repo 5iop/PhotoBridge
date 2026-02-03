@@ -13,6 +13,7 @@ type Config struct {
 	Port          string
 	UploadDir     string
 	DatabasePath  string
+	CNCDNURL      string // China CDN URL (e.g., https://cdn.pb.jangit.me)
 }
 
 var AppConfig *Config
@@ -29,6 +30,7 @@ func Load() {
 		Port:          getEnv("PORT", "8060"),
 		UploadDir:     getEnv("UPLOAD_DIR", "./uploads"),
 		DatabasePath:  getEnv("DATABASE_PATH", "./data/photobridge.db"),
+		CNCDNURL:      getEnv("CNCDN_URL", ""), // Optional China CDN URL
 	}
 	log.Printf("%s Configuration loaded - Port: %s, UploadDir: %s, DatabasePath: %s",
 		shortname, AppConfig.Port, AppConfig.UploadDir, AppConfig.DatabasePath)

@@ -7,6 +7,7 @@ import (
 	"photobridge/database"
 	"photobridge/models"
 	"photobridge/services"
+	"photobridge/utils"
 
 	"github.com/gin-gonic/gin"
 )
@@ -46,8 +47,21 @@ func serveThumb(c *gin.Context, photo *models.Photo, size string) {
 		return
 	}
 
-	c.Header("Content-Type", "image/jpeg")
+	// Generate ETag based on photo ID, update time, and size
+	etag := utils.GenerateETag(photo.ID, photo.UpdatedAt, size)
+
+	// Set ETag header
+	c.Header("ETag", etag)
 	c.Header("Cache-Control", "public, max-age=31536000")
+
+	// Check if client has fresh cache
+	if utils.CheckETag(c, etag) {
+		c.Status(http.StatusNotModified)
+		return
+	}
+
+	// Return thumbnail image
+	c.Header("Content-Type", "image/jpeg")
 	c.Data(http.StatusOK, "image/jpeg", thumbData)
 }
 
