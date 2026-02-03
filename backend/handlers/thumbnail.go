@@ -53,9 +53,12 @@ func serveThumb(c *gin.Context, photo *models.Photo, size string) {
 	// Generate ETag based on photo ID, update time, and size
 	etag := utils.GenerateETag(photo.ID, photo.UpdatedAt, size)
 
-	// Set ETag header
+	// Set caching headers
 	c.Header("ETag", etag)
 	c.Header("Cache-Control", "public, max-age=31536000")
+	// Tell Cloudflare to cache different versions based on Accept header
+	// This is important when serving different formats (JPEG, WebP, AVIF) in the future
+	c.Header("Vary", "Accept")
 
 	// Check if client has fresh cache (If-None-Match header)
 	if clientETag := c.GetHeader("If-None-Match"); clientETag != "" && clientETag == etag {
