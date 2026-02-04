@@ -180,13 +180,21 @@ func UpdateProject(c *gin.Context) {
 	}
 
 	updates := map[string]interface{}{}
+	var needsDirectoryRename bool
+	var oldName string
+
 	if req.Name != "" {
 		// 验证项目名称安全性
 		if _, valid := utils.SanitizeProjectName(req.Name); !valid {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid project name"})
 			return
 		}
-		updates["name"] = req.Name
+		// Check if name is actually changing
+		if req.Name != project.Name {
+			oldName = project.Name
+			needsDirectoryRename = true
+			updates["name"] = req.Name
+		}
 	}
 	if req.Description != "" {
 		updates["description"] = req.Description
@@ -195,7 +203,43 @@ func UpdateProject(c *gin.Context) {
 		updates["cover_photo"] = req.CoverPhoto
 	}
 
+	// If renaming project, rename the upload directory first
+	if needsDirectoryRename {
+		uploadsDir := filepath.Join("uploads")
+		oldPath := filepath.Join(uploadsDir, oldName)
+		newPath := filepath.Join(uploadsDir, req.Name)
+
+		// Check if old directory exists
+		if _, err := os.Stat(oldPath); err == nil {
+			// Check if new directory already exists
+			if _, err := os.Stat(newPath); err == nil {
+				c.JSON(http.StatusConflict, gin.H{
+					"error":   "Project directory already exists",
+					"message": fmt.Sprintf("Cannot rename: directory '%s' already exists", req.Name),
+				})
+				return
+			}
+
+			// Rename directory
+			if err := os.Rename(oldPath, newPath); err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{
+					"error":   "Failed to rename project directory",
+					"message": err.Error(),
+				})
+				return
+			}
+		}
+		// If old directory doesn't exist, continue (maybe no photos uploaded yet)
+	}
+
 	if err := database.DB.Model(&project).Updates(updates).Error; err != nil {
+		// If database update fails and we renamed directory, try to rollback
+		if needsDirectoryRename {
+			uploadsDir := filepath.Join("uploads")
+			oldPath := filepath.Join(uploadsDir, oldName)
+			newPath := filepath.Join(uploadsDir, req.Name)
+			os.Rename(newPath, oldPath) // Attempt rollback (ignore errors)
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update project"})
 		return
 	}
@@ -384,10 +428,34 @@ func DeletePhoto(c *gin.Context) {
 	photoID := c.Param("id")
 	var photo models.Photo
 
-	if err := database.DB.First(&photo, photoID).Error; err != nil {
+	if err := database.DB.Preload("Project").First(&photo, photoID).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Photo not found"})
 		return
 	}
+
+	// Delete physical files from disk
+	uploadsDir := filepath.Join("uploads", photo.Project.Name)
+
+	// Delete normal image file
+	if photo.NormalExt != "" {
+		normalPath := filepath.Join(uploadsDir, photo.BaseName+photo.NormalExt)
+		if err := os.Remove(normalPath); err != nil && !os.IsNotExist(err) {
+			// Log error but continue (file might already be deleted)
+			fmt.Printf("Warning: failed to delete normal file %s: %v\n", normalPath, err)
+		}
+	}
+
+	// Delete RAW file if exists
+	if photo.HasRaw && photo.RawExt != "" {
+		rawPath := filepath.Join(uploadsDir, photo.BaseName+photo.RawExt)
+		if err := os.Remove(rawPath); err != nil && !os.IsNotExist(err) {
+			// Log error but continue
+			fmt.Printf("Warning: failed to delete RAW file %s: %v\n", rawPath, err)
+		}
+	}
+
+	// Note: Thumbnails (ThumbSmall, ThumbLarge) are stored in database as BLOBs
+	// and will be automatically deleted when the record is deleted
 
 	// Delete exclusions
 	if err := database.DB.Where("photo_id = ?", photo.ID).Delete(&models.PhotoExclusion{}).Error; err != nil {
@@ -395,6 +463,7 @@ func DeletePhoto(c *gin.Context) {
 		return
 	}
 
+	// Delete database record
 	if err := database.DB.Delete(&photo).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete photo"})
 		return

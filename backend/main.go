@@ -19,6 +19,9 @@ import (
 const shortname = "[PhotoBridge]"
 
 func main() {
+	// Set log format to include date, time, and short file name (file.go:line)
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
+
 	log.Printf("%s Starting PhotoBridge", shortname)
 
 	// Load configuration
@@ -45,28 +48,44 @@ func main() {
 	// Configure CORS
 	// In production (Docker), restrict CORS to prevent unauthorized access
 	// In development, allow all origins for convenience
-	corsOrigins := []string{"*"}
+	var corsConfig cors.Config
 	if os.Getenv("ENV") == "production" || os.Getenv("DOCKER") == "true" {
-		// Production: Only allow same-origin requests
-		// If you need specific origins, set CORS_ALLOWED_ORIGINS env var
+		// Production: Use specific origins if provided, otherwise allow all requests
 		if allowedOrigins := os.Getenv("CORS_ALLOWED_ORIGINS"); allowedOrigins != "" {
-			corsOrigins = []string{allowedOrigins}
+			corsConfig = cors.Config{
+				AllowOrigins:     []string{allowedOrigins},
+				AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+				AllowHeaders:     []string{"Origin", "Content-Type", "Authorization", "X-API-Key"},
+				ExposeHeaders:    []string{"Content-Length", "Content-Disposition"},
+				AllowCredentials: true,
+			}
+			log.Printf("%s CORS restricted to: %v", shortname, []string{allowedOrigins})
 		} else {
-			// Fallback: No wildcard, require exact origin match
-			corsOrigins = []string{}
+			// Fallback: Allow any origin (frontend and backend are typically on same domain)
+			corsConfig = cors.Config{
+				AllowOriginFunc: func(origin string) bool {
+					return true // Allow all origins
+				},
+				AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+				AllowHeaders:     []string{"Origin", "Content-Type", "Authorization", "X-API-Key"},
+				ExposeHeaders:    []string{"Content-Length", "Content-Disposition"},
+				AllowCredentials: true,
+			}
+			log.Printf("%s CORS allowing all origins (no CORS_ALLOWED_ORIGINS set)", shortname)
 		}
-		log.Printf("%s CORS restricted to: %v", shortname, corsOrigins)
 	} else {
+		// Development: Allow all origins
+		corsConfig = cors.Config{
+			AllowOrigins:     []string{"*"},
+			AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+			AllowHeaders:     []string{"Origin", "Content-Type", "Authorization", "X-API-Key"},
+			ExposeHeaders:    []string{"Content-Length", "Content-Disposition"},
+			AllowCredentials: true,
+		}
 		log.Printf("%s CORS allowing all origins (development mode)", shortname)
 	}
 
-	r.Use(cors.New(cors.Config{
-		AllowOrigins:     corsOrigins,
-		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization", "X-API-Key"},
-		ExposeHeaders:    []string{"Content-Length", "Content-Disposition"},
-		AllowCredentials: true,
-	}))
+	r.Use(cors.New(corsConfig))
 
 	// Serve uploaded files
 	r.Static("/uploads", config.AppConfig.UploadDir)

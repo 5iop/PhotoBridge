@@ -12,7 +12,7 @@ import (
 
 const (
 	verificationCookieName = "pb_verified"
-	cookieMaxAge           = 30 * 24 * 60 * 60 // 30 days
+	cookieMaxAge           = 24 * 60 * 60 // 1 day (matching verification logic TTL)
 )
 
 // RequireTurnstile is a middleware that requires Turnstile verification for first-time visitors
@@ -86,7 +86,7 @@ func VerifyTurnstileHandler(c *gin.Context) {
 	// Check TLS or X-Forwarded-Proto header (for reverse proxies)
 	isSecure := c.Request.TLS != nil || c.GetHeader("X-Forwarded-Proto") == "https"
 
-	// Set verification cookie (30 days)
+	// Set verification cookie (1 day)
 	c.SetCookie(
 		verificationCookieName,
 		utils.GenerateVerificationCookie(),

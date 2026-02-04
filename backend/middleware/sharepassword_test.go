@@ -276,8 +276,8 @@ func TestVerifySharePasswordHandler_Success(t *testing.T) {
 			if cookie.Value == "" {
 				t.Error("Cookie value should not be empty")
 			}
-			if cookie.MaxAge != 30*24*60*60 {
-				t.Errorf("Cookie MaxAge should be 30 days, got %d", cookie.MaxAge)
+			if cookie.MaxAge != 24*60*60 {
+				t.Errorf("Cookie MaxAge should be 1 day, got %d", cookie.MaxAge)
 			}
 			if !cookie.HttpOnly {
 				t.Error("Cookie should be HttpOnly")

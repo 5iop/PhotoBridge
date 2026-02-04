@@ -13,7 +13,7 @@ import (
 
 const (
 	passwordCookieName   = "pb_share_verified_"
-	passwordCookieMaxAge = 30 * 24 * 60 * 60 // 30 days
+	passwordCookieMaxAge = 24 * 60 * 60 // 1 day (matching password verification logic TTL)
 )
 
 // RequireSharePassword is a middleware that requires password verification for share links
@@ -91,7 +91,7 @@ func VerifySharePasswordHandler(c *gin.Context) {
 	// Check TLS or X-Forwarded-Proto header (for reverse proxies)
 	isSecure := c.Request.TLS != nil || c.GetHeader("X-Forwarded-Proto") == "https"
 
-	// Set verification cookie (30 days)
+	// Set verification cookie (1 day)
 	cookieName := passwordCookieName + token
 	c.SetCookie(
 		cookieName,
