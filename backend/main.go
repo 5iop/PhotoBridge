@@ -54,6 +54,12 @@ func main() {
 	// Serve uploaded files
 	r.Static("/uploads", config.AppConfig.UploadDir)
 
+	// Robots.txt - Block all crawlers
+	r.GET("/robots.txt", func(c *gin.Context) {
+		c.Header("Content-Type", "text/plain; charset=utf-8")
+		c.String(http.StatusOK, "User-agent: *\nDisallow: /\n")
+	})
+
 	// API routes
 	api := r.Group("/api")
 	{
