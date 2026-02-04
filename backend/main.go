@@ -54,6 +54,13 @@ func main() {
 	// Serve uploaded files
 	r.Static("/uploads", config.AppConfig.UploadDir)
 
+	// Serve frontend static files (must be before wildcard routes)
+	frontendDir := "./frontend/dist"
+	if _, err := os.Stat(frontendDir); err == nil {
+		r.Static("/assets", filepath.Join(frontendDir, "assets"))
+		r.StaticFile("/vite.svg", filepath.Join(frontendDir, "vite.svg"))
+	}
+
 	// Robots.txt - Block all crawlers
 	r.GET("/robots.txt", func(c *gin.Context) {
 		c.Header("Content-Type", "text/plain; charset=utf-8")
@@ -138,13 +145,23 @@ func main() {
 		}
 	}
 
-	// Serve frontend static files (for production)
-	frontendDir := "./frontend/dist"
-	if _, err := os.Stat(frontendDir); err == nil {
-		r.Static("/assets", filepath.Join(frontendDir, "assets"))
-		r.StaticFile("/vite.svg", filepath.Join(frontendDir, "vite.svg"))
+	// Short share links (without /api/share prefix)
+	// Example: https://pb.jangit.me/bTfV43AA instead of https://pb.jangit.me/api/share/bTfV43AA
+	shortLinks := r.Group("")
+	shortLinks.Use(middleware.RequireTurnstile()) // Require verification for first-time visitors
+	{
+		shortLinks.GET("/:token", handlers.GetShareInfo)
+		shortLinks.GET("/:token/photos", handlers.GetSharePhotos)
+		shortLinks.GET("/:token/photo/:photoId", handlers.GetSharePhoto)
+		shortLinks.GET("/:token/photo/:photoId/exif", handlers.GetPhotoExif)
+		shortLinks.GET("/:token/photo/:photoId/download", handlers.DownloadSinglePhoto)
+		shortLinks.GET("/:token/photo/:photoId/thumb/small", handlers.GetSharePhotoThumbSmall)
+		shortLinks.GET("/:token/photo/:photoId/thumb/large", handlers.GetSharePhotoThumbLarge)
+		shortLinks.GET("/:token/download", handlers.DownloadSharePhotos)
+	}
 
-		// Serve index.html for all non-API routes (SPA support)
+	// Serve index.html for all non-API routes (SPA support)
+	if _, err := os.Stat(frontendDir); err == nil {
 		r.NoRoute(func(c *gin.Context) {
 			c.File(filepath.Join(frontendDir, "index.html"))
 		})
