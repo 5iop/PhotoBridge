@@ -18,7 +18,10 @@ const editingLink = ref(null)
 
 const newAlias = ref('')
 const newAllowRaw = ref(true)
+const newPasswordEnabled = ref(true)
 const newExclusions = ref(new Set())
+const showCopyMenu = ref({})
+const copiedLinkId = ref(null)
 
 const projectId = computed(() => route.params.id)
 
@@ -53,8 +56,32 @@ function getShareUrl(link) {
   return `${window.location.origin}/s/${link.token}`
 }
 
+function toggleCopyMenu(linkId) {
+  const currentState = showCopyMenu.value[linkId] || false
+  // Create new object to ensure reactivity
+  showCopyMenu.value = { [linkId]: !currentState }
+}
+
 function copyLink(link) {
   navigator.clipboard.writeText(getShareUrl(link))
+  showCopyMenu.value[link.id] = false
+  copiedLinkId.value = link.id
+  setTimeout(() => { copiedLinkId.value = null }, 2000)
+}
+
+async function copyPassword(link) {
+  await navigator.clipboard.writeText(link.password)
+  showCopyMenu.value[link.id] = false
+  copiedLinkId.value = link.id
+  setTimeout(() => { copiedLinkId.value = null }, 2000)
+}
+
+async function copyLinkWithPassword(link) {
+  const template = `【${project.value.name}】链接: ${getShareUrl(link)}\n密码: ${link.password}`
+  await navigator.clipboard.writeText(template)
+  showCopyMenu.value[link.id] = false
+  copiedLinkId.value = link.id
+  setTimeout(() => { copiedLinkId.value = null }, 2000)
 }
 
 async function createLink() {
@@ -62,6 +89,7 @@ async function createLink() {
     await api.createShareLink(projectId.value, {
       alias: newAlias.value.trim(),
       allow_raw: newAllowRaw.value,
+      password_enabled: newPasswordEnabled.value,
       exclusions: Array.from(newExclusions.value)
     })
     showCreateModal.value = false
@@ -76,6 +104,7 @@ function openEditModal(link) {
   editingLink.value = link
   newAlias.value = link.alias || ''
   newAllowRaw.value = link.allow_raw
+  newPasswordEnabled.value = link.password_enabled !== undefined ? link.password_enabled : true
   newExclusions.value = new Set((link.exclusions || []).map(e => e.photo_id))
   showEditModal.value = true
 }
@@ -85,6 +114,7 @@ async function updateLink() {
     await api.updateShareLink(editingLink.value.id, {
       alias: newAlias.value.trim(),
       allow_raw: newAllowRaw.value,
+      password_enabled: newPasswordEnabled.value,
       exclusions: Array.from(newExclusions.value)
     })
     showEditModal.value = false
@@ -111,8 +141,11 @@ function toggleExclusion(photoId) {
 }
 
 function resetForm() {
-  newAlias.value = ''
+  // Check if any link uses "default" as alias
+  const hasDefault = links.value.some(link => link.alias === 'default')
+  newAlias.value = hasDefault ? '' : 'default'
   newAllowRaw.value = true
+  newPasswordEnabled.value = true
   newExclusions.value = new Set()
   editingLink.value = null
 }
@@ -192,18 +225,64 @@ function openCreateModal() {
                   </svg>
                   禁止 RAW
                 </span>
+                <span v-if="link.password_enabled" class="inline-flex items-center gap-1 text-xs text-green-600">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                  </svg>
+                  密码: <span class="font-mono font-semibold">{{ link.password }}</span>
+                </span>
+                <span v-else class="inline-flex items-center gap-1 text-xs text-cf-muted">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z" />
+                  </svg>
+                  无密码
+                </span>
                 <span v-if="link.exclusions?.length" class="text-xs text-cf-muted">
                   {{ link.exclusions.length }} 张照片已隐藏
                 </span>
               </div>
             </div>
             <div class="flex items-center gap-2">
-              <button @click="copyLink(link)" class="btn btn-secondary text-sm">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
-                </svg>
-                复制
-              </button>
+              <div class="relative">
+                <button
+                  @click="toggleCopyMenu(link.id)"
+                  class="btn btn-secondary text-sm flex items-center gap-1"
+                  :class="copiedLinkId === link.id ? 'bg-green-100 border-green-500 text-green-600' : ''"
+                >
+                  <svg v-if="copiedLinkId !== link.id" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+                  </svg>
+                  <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                  </svg>
+                  {{ copiedLinkId === link.id ? '已复制' : '复制' }}
+                  <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+
+                <!-- Dropdown menu -->
+                <div v-if="showCopyMenu[link.id]" class="absolute left-0 mt-1 w-48 bg-white rounded-lg shadow-lg border border-cf-border z-10" @click.stop>
+                  <button @click="copyLink(link)" class="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2 rounded-t-lg">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                    </svg>
+                    复制链接
+                  </button>
+                  <button v-if="link.password_enabled" @click="copyPassword(link)" class="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                    </svg>
+                    复制密码
+                  </button>
+                  <button v-if="link.password_enabled" @click="copyLinkWithPassword(link)" class="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2 rounded-b-lg">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    复制链接+密码
+                  </button>
+                </div>
+              </div>
               <button @click="openEditModal(link)" class="btn btn-secondary text-sm">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -250,8 +329,25 @@ function openCreateModal() {
                 :class="newAllowRaw ? 'left-7' : 'left-1'"
               ></span>
             </button>
-            <span class="text-cf-text">允许下载 RAW 文件</span>
+            <span class="text-cf-text">允许RAW文件</span>
           </div>
+
+          <div class="flex items-center gap-3">
+            <button
+              @click="newPasswordEnabled = !newPasswordEnabled"
+              class="relative w-12 h-6 rounded-full transition-colors"
+              :class="newPasswordEnabled ? 'bg-primary-500' : 'bg-gray-200'"
+            >
+              <span
+                class="absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-transform"
+                :class="newPasswordEnabled ? 'left-7' : 'left-1'"
+              ></span>
+            </button>
+            <span class="text-cf-text">启用访问密码保护</span>
+          </div>
+          <p v-if="newPasswordEnabled" class="text-sm text-cf-muted -mt-4 ml-14">
+            系统将自动生成4位数字密码
+          </p>
 
           <div>
             <label class="label">隐藏的照片（点击切换）</label>

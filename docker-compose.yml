@@ -16,6 +16,7 @@ services:
       - JWT_SECRET=${JWT_SECRET:-photobridge-jwt-secret}
       - PORT=80
       - GIN_MODE=release
+      - CNCDN_URL=${CNCDN_URL:-}
     volumes:
       - photobridge_data:/app/data
       - photobridge_uploads:/app/uploads

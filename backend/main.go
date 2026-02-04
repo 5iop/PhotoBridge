@@ -43,8 +43,25 @@ func main() {
 	r.MaxMultipartMemory = 8 << 20 // 8 MB
 
 	// Configure CORS
+	// In production (Docker), restrict CORS to prevent unauthorized access
+	// In development, allow all origins for convenience
+	corsOrigins := []string{"*"}
+	if os.Getenv("ENV") == "production" || os.Getenv("DOCKER") == "true" {
+		// Production: Only allow same-origin requests
+		// If you need specific origins, set CORS_ALLOWED_ORIGINS env var
+		if allowedOrigins := os.Getenv("CORS_ALLOWED_ORIGINS"); allowedOrigins != "" {
+			corsOrigins = []string{allowedOrigins}
+		} else {
+			// Fallback: No wildcard, require exact origin match
+			corsOrigins = []string{}
+		}
+		log.Printf("%s CORS restricted to: %v", shortname, corsOrigins)
+	} else {
+		log.Printf("%s CORS allowing all origins (development mode)", shortname)
+	}
+
 	r.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"*"},
+		AllowOrigins:     corsOrigins,
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization", "X-API-Key"},
 		ExposeHeaders:    []string{"Content-Length", "Content-Disposition"},
@@ -136,14 +153,22 @@ func main() {
 		share := api.Group("/share")
 		share.Use(middleware.RequireTurnstile()) // Require verification for first-time visitors
 		{
-			share.GET("/:token", handlers.GetShareInfo)
-			share.GET("/:token/photos", handlers.GetSharePhotos)
-			share.GET("/:token/photo/:photoId", handlers.GetSharePhoto)
-			share.GET("/:token/photo/:photoId/exif", handlers.GetPhotoExif)
-			share.GET("/:token/photo/:photoId/download", handlers.DownloadSinglePhoto)
-			share.GET("/:token/photo/:photoId/thumb/small", handlers.GetSharePhotoThumbSmall)
-			share.GET("/:token/photo/:photoId/thumb/large", handlers.GetSharePhotoThumbLarge)
-			share.GET("/:token/download", handlers.DownloadSharePhotos)
+			// Password verification endpoint (does not require password middleware)
+			share.POST("/:token/verify-password", middleware.VerifySharePasswordHandler)
+
+			// Protected routes (require password if enabled)
+			shareProtected := share.Group("")
+			shareProtected.Use(middleware.RequireSharePassword())
+			{
+				shareProtected.GET("/:token", handlers.GetShareInfo)
+				shareProtected.GET("/:token/photos", handlers.GetSharePhotos)
+				shareProtected.GET("/:token/photo/:photoId", handlers.GetSharePhoto)
+				shareProtected.GET("/:token/photo/:photoId/exif", handlers.GetPhotoExif)
+				shareProtected.GET("/:token/photo/:photoId/download", handlers.DownloadSinglePhoto)
+				shareProtected.GET("/:token/photo/:photoId/thumb/small", handlers.GetSharePhotoThumbSmall)
+				shareProtected.GET("/:token/photo/:photoId/thumb/large", handlers.GetSharePhotoThumbLarge)
+				shareProtected.GET("/:token/download", handlers.DownloadSharePhotos)
+			}
 		}
 	}
 

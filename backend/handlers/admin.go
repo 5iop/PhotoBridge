@@ -281,11 +281,20 @@ func CreateShareLink(c *gin.Context) {
 		return
 	}
 
+	// Generate password if enabled
+	password := ""
+	passwordEnabled := req.PasswordEnabled
+	if passwordEnabled {
+		password = utils.GenerateSharePassword()
+	}
+
 	link := models.ShareLink{
-		ProjectID: project.ID,
-		Token:     token,
-		Alias:     req.Alias,
-		AllowRaw:  req.AllowRaw,
+		ProjectID:       project.ID,
+		Token:           token,
+		Alias:           req.Alias,
+		AllowRaw:        req.AllowRaw,
+		PasswordEnabled: passwordEnabled,
+		Password:        password,
 	}
 
 	result := database.DB.Create(&link)
@@ -323,11 +332,19 @@ func UpdateShareLink(c *gin.Context) {
 	}
 
 	updates := map[string]interface{}{}
-	if req.Alias != "" {
-		updates["alias"] = req.Alias
-	}
+	// Always update alias (allow clearing it with empty string)
+	updates["alias"] = req.Alias
 	if req.AllowRaw != nil {
 		updates["allow_raw"] = *req.AllowRaw
+	}
+	if req.PasswordEnabled != nil {
+		updates["password_enabled"] = *req.PasswordEnabled
+		// Generate password when enabling, clear when disabling
+		if *req.PasswordEnabled && link.Password == "" {
+			updates["password"] = utils.GenerateSharePassword()
+		} else if !*req.PasswordEnabled {
+			updates["password"] = ""
+		}
 	}
 
 	database.DB.Model(&link).Updates(updates)

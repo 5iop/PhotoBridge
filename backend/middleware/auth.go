@@ -55,12 +55,10 @@ func JWTAuth() gin.HandlerFunc {
 
 func APIKeyAuth() gin.HandlerFunc {
 	return func(c *gin.Context) {
+		// Only accept API key from header to prevent logging/Referer leaks
 		apiKey := c.GetHeader("X-API-Key")
-		if apiKey == "" {
-			apiKey = c.Query("api_key")
-		}
 
-		if apiKey != config.AppConfig.APIKey {
+		if apiKey == "" || apiKey != config.AppConfig.APIKey {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid API key"})
 			c.Abort()
 			return

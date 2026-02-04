@@ -11,7 +11,10 @@ import (
 	"photobridge/utils"
 )
 
-const shortname = "[ThumbQueue]"
+const (
+	shortname      = "[ThumbQueue]"
+	maxQueueLength = 1000 // Limit queue length to prevent memory exhaustion
+)
 
 // ThumbTask represents a thumbnail generation task (only stores path info, not image data)
 type ThumbTask struct {
@@ -160,6 +163,14 @@ func (q *ThumbQueue) Enqueue(photo *models.Photo, projectName string) bool {
 	}
 
 	q.tasksMu.Lock()
+	// Check queue length limit to prevent memory exhaustion
+	if len(q.tasks) >= maxQueueLength {
+		q.tasksMu.Unlock()
+		q.processing.Delete(photo.ID) // Remove from processing map
+		log.Printf("%s Queue full (%d), rejecting photo %d", shortname, maxQueueLength, photo.ID)
+		return false
+	}
+
 	q.tasks = append(q.tasks, task)
 	queueLen := len(q.tasks)
 	q.cond.Signal() // Wake up one worker

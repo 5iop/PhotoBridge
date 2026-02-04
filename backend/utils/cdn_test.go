@@ -2,6 +2,7 @@ package utils
 
 import (
 	"net/http/httptest"
+	"os"
 	"testing"
 
 	"photobridge/config"
@@ -10,8 +11,19 @@ import (
 )
 
 func TestGetCDNBaseURL(t *testing.T) {
-	// Save original config
+	// Save original config and environment
 	originalConfig := config.AppConfig
+	originalDocker := os.Getenv("DOCKER")
+	originalEnv := os.Getenv("ENV")
+	defer func() {
+		config.AppConfig = originalConfig
+		os.Setenv("DOCKER", originalDocker)
+		os.Setenv("ENV", originalEnv)
+	}()
+
+	// Set Docker environment to enable CDN logic
+	os.Setenv("DOCKER", "true")
+	os.Setenv("ENV", "production")
 
 	tests := []struct {
 		name           string
@@ -84,15 +96,22 @@ func TestGetCDNBaseURL(t *testing.T) {
 			}
 		})
 	}
-
-	// Restore original config
-	config.AppConfig = originalConfig
 }
 
 func TestGetCDNBaseURLMultipleRequests(t *testing.T) {
-	// Save original config
+	// Save original config and environment
 	originalConfig := config.AppConfig
-	defer func() { config.AppConfig = originalConfig }()
+	originalDocker := os.Getenv("DOCKER")
+	originalEnv := os.Getenv("ENV")
+	defer func() {
+		config.AppConfig = originalConfig
+		os.Setenv("DOCKER", originalDocker)
+		os.Setenv("ENV", originalEnv)
+	}()
+
+	// Set Docker environment to enable CDN logic
+	os.Setenv("DOCKER", "true")
+	os.Setenv("ENV", "production")
 
 	config.AppConfig = &config.Config{
 		CNCDNURL: "https://cdn.test.com",
@@ -134,15 +153,23 @@ func TestGetCDNBaseURLMultipleRequests(t *testing.T) {
 }
 
 func TestGetCDNBaseURLNilConfig(t *testing.T) {
-	// Save original config
+	// Save original config and environment
 	originalConfig := config.AppConfig
+	originalDocker := os.Getenv("DOCKER")
+	originalEnv := os.Getenv("ENV")
 	defer func() {
 		config.AppConfig = originalConfig
+		os.Setenv("DOCKER", originalDocker)
+		os.Setenv("ENV", originalEnv)
 		// Recover from potential panic
 		if r := recover(); r != nil {
 			t.Logf("Recovered from panic: %v", r)
 		}
 	}()
+
+	// Set Docker environment to enable CDN logic
+	os.Setenv("DOCKER", "true")
+	os.Setenv("ENV", "production")
 
 	// Test with nil config (should not panic)
 	config.AppConfig = &config.Config{
@@ -163,9 +190,19 @@ func TestGetCDNBaseURLNilConfig(t *testing.T) {
 }
 
 func TestGetCDNBaseURLSpecialCountries(t *testing.T) {
-	// Save original config
+	// Save original config and environment
 	originalConfig := config.AppConfig
-	defer func() { config.AppConfig = originalConfig }()
+	originalDocker := os.Getenv("DOCKER")
+	originalEnv := os.Getenv("ENV")
+	defer func() {
+		config.AppConfig = originalConfig
+		os.Setenv("DOCKER", originalDocker)
+		os.Setenv("ENV", originalEnv)
+	}()
+
+	// Set Docker environment to enable CDN logic
+	os.Setenv("DOCKER", "true")
+	os.Setenv("ENV", "production")
 
 	config.AppConfig = &config.Config{
 		CNCDNURL: "https://cdn.example.com",
@@ -215,9 +252,19 @@ func TestGetCDNBaseURLSpecialCountries(t *testing.T) {
 }
 
 func TestGetCDNBaseURLDifferentCDNURLs(t *testing.T) {
-	// Save original config
+	// Save original config and environment
 	originalConfig := config.AppConfig
-	defer func() { config.AppConfig = originalConfig }()
+	originalDocker := os.Getenv("DOCKER")
+	originalEnv := os.Getenv("ENV")
+	defer func() {
+		config.AppConfig = originalConfig
+		os.Setenv("DOCKER", originalDocker)
+		os.Setenv("ENV", originalEnv)
+	}()
+
+	// Set Docker environment to enable CDN logic
+	os.Setenv("DOCKER", "true")
+	os.Setenv("ENV", "production")
 
 	cdnURLs := []string{
 		"https://cdn1.example.com",

@@ -252,22 +252,52 @@ func TestThumbQueueProcessingCleanup(t *testing.T) {
 	}
 }
 
-func TestThumbQueueUnbounded(t *testing.T) {
+func TestThumbQueueMaxLimit(t *testing.T) {
 	q := createTestQueue()
 
-	// Enqueue a large number of photos to verify unbounded queue
-	largeCount := 10000
-	for i := uint(1); i <= uint(largeCount); i++ {
+	// Try to enqueue more than the max queue length (1000)
+	// The queue should reject items beyond the limit
+	successCount := 0
+	for i := uint(1); i <= 1500; i++ {
 		photo := &models.Photo{
 			BaseName:  "test",
 			NormalExt: ".jpg",
 		}
 		photo.ID = i
-		q.Enqueue(photo, "test-project")
+		if q.Enqueue(photo, "test-project") {
+			successCount++
+		}
 	}
 
-	if q.QueueLength() != largeCount {
-		t.Errorf("Queue should hold %d items, got %d", largeCount, q.QueueLength())
+	// Should only accept up to maxQueueLength (1000)
+	if successCount != 1000 {
+		t.Errorf("Expected %d successful enqueues, got %d", 1000, successCount)
+	}
+
+	if q.QueueLength() != 1000 {
+		t.Errorf("Queue length should be capped at 1000, got %d", q.QueueLength())
+	}
+}
+
+func TestThumbQueueBelowLimit(t *testing.T) {
+	q := createTestQueue()
+
+	// Enqueue below the limit
+	count := 500
+	for i := uint(1); i <= uint(count); i++ {
+		photo := &models.Photo{
+			BaseName:  "test",
+			NormalExt: ".jpg",
+		}
+		photo.ID = i
+		result := q.Enqueue(photo, "test-project")
+		if !result {
+			t.Errorf("Enqueue should succeed when below limit, failed at %d", i)
+		}
+	}
+
+	if q.QueueLength() != count {
+		t.Errorf("Queue should hold %d items, got %d", count, q.QueueLength())
 	}
 }
 

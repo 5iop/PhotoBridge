@@ -13,6 +13,10 @@ const loading = ref(true)
 const error = ref('')
 const showTurnstile = ref(false)
 const turnstileSiteKey = ref('')
+const showPasswordModal = ref(false)
+const password = ref('')
+const passwordError = ref('')
+const verifyingPassword = ref(false)
 
 // 跟踪缩略图加载失败的照片
 const failedThumbs = reactive(new Set())
@@ -67,6 +71,14 @@ async function fetchData() {
       loading.value = false
       return
     }
+
+    // Check if password is required
+    if (err.response?.status === 403 && err.response?.data?.error === 'password_required') {
+      showPasswordModal.value = true
+      loading.value = false
+      return
+    }
+
     error.value = err.response?.data?.error || '加载失败'
   } finally {
     loading.value = false
@@ -76,6 +88,23 @@ async function fetchData() {
 function handleVerified() {
   showTurnstile.value = false
   fetchData()
+}
+
+async function verifyPassword() {
+  verifyingPassword.value = true
+  passwordError.value = ''
+
+  try {
+    await api.verifySharePassword(token.value, password.value)
+    showPasswordModal.value = false
+    password.value = ''
+    await fetchData()
+  } catch (err) {
+    passwordError.value = err.response?.data?.message || '密码错误'
+    password.value = ''
+  } finally {
+    verifyingPassword.value = false
+  }
 }
 
 function getPhotoUrl(photo) {
@@ -368,6 +397,52 @@ function download() {
       @verified="handleVerified"
     />
 
+    <!-- Password Verification -->
+    <div v-if="showPasswordModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+      <div class="card p-8 w-full max-w-sm" @click.stop>
+        <div class="text-center mb-6">
+          <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary-100 mb-4">
+            <svg class="w-8 h-8 text-primary-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+            </svg>
+          </div>
+          <h2 class="text-xl font-bold text-cf-text mb-2">输入访问密码</h2>
+          <p class="text-sm text-cf-muted">此分享链接受密码保护</p>
+        </div>
+
+        <div class="mb-4">
+          <input
+            v-model="password"
+            type="text"
+            placeholder="····"
+            class="input text-center text-2xl tracking-widest font-mono"
+            :class="passwordError ? 'border-red-500' : ''"
+            @keyup.enter="verifyPassword"
+            autofocus
+          />
+          <p v-if="passwordError" class="text-sm text-red-500 mt-2 text-center">
+            {{ passwordError }}
+          </p>
+        </div>
+
+        <button
+          @click="verifyPassword"
+          :disabled="verifyingPassword"
+          class="btn btn-primary w-full"
+          :class="{ 'opacity-50 cursor-not-allowed': verifyingPassword }">
+          <svg v-if="verifyingPassword" class="w-5 h-5 spinner" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+          </svg>
+          <span v-else>验证</span>
+        </button>
+
+        <p class="text-xs text-cf-muted text-center mt-4">
+          密码由分享者提供，请联系获取
+        </p>
+      </div>
+    </div>
+
     <!-- Loading -->
     <div v-if="loading" class="min-h-screen flex items-center justify-center">
       <svg class="w-12 h-12 text-primary-500 spinner" fill="none" viewBox="0 0 24 24">
@@ -390,7 +465,7 @@ function download() {
     </div>
 
     <!-- Gallery -->
-    <div v-else>
+    <div v-else-if="info">
       <!-- Header -->
       <header class="sticky top-0 z-40 bg-white/80 backdrop-blur-lg border-b border-cf-border">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">

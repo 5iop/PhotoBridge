@@ -57,6 +57,8 @@ export const deleteShareLink = (id) => api.delete(`/admin/links/${id}`)
 export const getShareInfo = (token) => api.get(`/share/${token}`)
 export const getSharePhotos = (token) => api.get(`/share/${token}/photos`)
 export const getPhotoExif = (token, photoId) => api.get(`/share/${token}/photo/${photoId}/exif`)
+export const verifySharePassword = (token, password) =>
+  api.post(`/share/${token}/verify-password`, { password })
 
 // Admin EXIF and files
 export const getAdminPhotoExif = (photoId) => api.get(`/admin/photos/${photoId}/exif`)

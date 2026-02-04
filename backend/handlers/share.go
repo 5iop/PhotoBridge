@@ -56,7 +56,11 @@ func GetShareInfo(c *gin.Context) {
 
 	// Get country from CF-IPCountry header
 	var country *string
-	if countryHeader := c.GetHeader("CF-IPCountry"); countryHeader != "" {
+	// In development environment (non-Docker), return "DEV" as country
+	if os.Getenv("ENV") != "production" && os.Getenv("DOCKER") != "true" {
+		devCountry := "DEV"
+		country = &devCountry
+	} else if countryHeader := c.GetHeader("CF-IPCountry"); countryHeader != "" {
 		country = &countryHeader
 	}
 

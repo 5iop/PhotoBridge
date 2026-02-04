@@ -48,6 +48,7 @@ services:
       - JWT_SECRET=${JWT_SECRET:-photobridge-jwt-secret}
       - PORT=80
       - GIN_MODE=release
+      - CNCDN_URL=${CNCDN_URL:-}
     volumes:
       - ./photobridge/data:/app/data
       - ./uploads:/app/uploads
@@ -64,6 +65,9 @@ services:
       - "traefik.http.routers.photobridge.tls=true"
       - "traefik.http.routers.photobridge.tls.certresolver=letsencrypt"
       - "traefik.http.services.photobridge.loadbalancer.server.port=80"
+      # Apply compression middleware
+      - "traefik.http.routers.photobridge.middlewares=photobridge-compress"
+      - "traefik.http.middlewares.photobridge-compress.compress=true"
       # HTTP redirect to HTTPS
       - "traefik.http.routers.photobridge-http.rule=Host(`pb.jangit.me`)"
       - "traefik.http.routers.photobridge-http.entrypoints=web"

@@ -113,11 +113,16 @@ func TestRequireTurnstile_SkipForCDNIP(t *testing.T) {
 	defer func() {
 		config.AppConfig.TurnstileSiteKey = originalSiteKey
 		config.AppConfig.TurnstileSecretKey = originalSecretKey
+		// Re-initialize CDN IP set after test
+		config.AppConfig.InitCDNIPSet()
 	}()
 
 	// Enable Turnstile
 	config.AppConfig.TurnstileSiteKey = "test-site-key"
 	config.AppConfig.TurnstileSecretKey = "test-secret-key"
+
+	// Ensure CDN IP set is initialized
+	config.AppConfig.InitCDNIPSet()
 
 	// Add a test IP to CDN whitelist
 	testIP := "1.2.3.4"
@@ -273,11 +278,16 @@ func TestRequireTurnstile_IPWithPort(t *testing.T) {
 	defer func() {
 		config.AppConfig.TurnstileSiteKey = originalSiteKey
 		config.AppConfig.TurnstileSecretKey = originalSecretKey
+		// Re-initialize CDN IP set after test
+		config.AppConfig.InitCDNIPSet()
 	}()
 
 	// Enable Turnstile
 	config.AppConfig.TurnstileSiteKey = "test-site-key"
 	config.AppConfig.TurnstileSecretKey = "test-secret-key"
+
+	// Ensure CDN IP set is initialized
+	config.AppConfig.InitCDNIPSet()
 
 	// Add IP to whitelist (without port)
 	testIP := "1.2.3.4"

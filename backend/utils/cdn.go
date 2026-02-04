@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"os"
 	"photobridge/config"
 
 	"github.com/gin-gonic/gin"
@@ -9,7 +10,13 @@ import (
 // GetCDNBaseURL returns the appropriate CDN base URL based on the client's country
 // For China (CF-IPCountry: CN), returns CNCDN_URL if configured
 // For other countries, returns empty string (use relative URLs)
+// In development (non-Docker) environment, always returns empty string
 func GetCDNBaseURL(c *gin.Context) string {
+	// Skip CDN in development environment (non-Docker)
+	if os.Getenv("ENV") != "production" && os.Getenv("DOCKER") != "true" {
+		return ""
+	}
+
 	// Check if China CDN is configured
 	if config.AppConfig.CNCDNURL == "" {
 		return ""
