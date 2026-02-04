@@ -6,14 +6,16 @@ import (
 )
 
 type Config struct {
-	AdminUsername string
-	AdminPassword string
-	APIKey        string
-	JWTSecret     string
-	Port          string
-	UploadDir     string
-	DatabasePath  string
-	CNCDNURL      string // China CDN URL (e.g., https://cdn.pb.jangit.me)
+	AdminUsername      string
+	AdminPassword      string
+	APIKey             string
+	JWTSecret          string
+	Port               string
+	UploadDir          string
+	DatabasePath       string
+	CNCDNURL           string // China CDN URL (e.g., https://cdn.pb.jangit.me)
+	TurnstileSiteKey   string // Cloudflare Turnstile site key (public)
+	TurnstileSecretKey string // Cloudflare Turnstile secret key (private)
 }
 
 var AppConfig *Config
@@ -23,14 +25,16 @@ const shortname = "[Config]"
 func Load() {
 	log.Printf("%s Loading configuration", shortname)
 	AppConfig = &Config{
-		AdminUsername: getEnv("ADMIN_USERNAME", "admin"),
-		AdminPassword: getEnv("ADMIN_PASSWORD", "admin123"),
-		APIKey:        getEnv("API_KEY", "photobridge-api-key"),
-		JWTSecret:     getEnv("JWT_SECRET", "photobridge-jwt-secret"),
-		Port:          getEnv("PORT", "8060"),
-		UploadDir:     getEnv("UPLOAD_DIR", "./uploads"),
-		DatabasePath:  getEnv("DATABASE_PATH", "./data/photobridge.db"),
-		CNCDNURL:      getEnv("CNCDN_URL", ""), // Optional China CDN URL
+		AdminUsername:      getEnv("ADMIN_USERNAME", "admin"),
+		AdminPassword:      getEnv("ADMIN_PASSWORD", "admin123"),
+		APIKey:             getEnv("API_KEY", "photobridge-api-key"),
+		JWTSecret:          getEnv("JWT_SECRET", "photobridge-jwt-secret"),
+		Port:               getEnv("PORT", "8060"),
+		UploadDir:          getEnv("UPLOAD_DIR", "./uploads"),
+		DatabasePath:       getEnv("DATABASE_PATH", "./data/photobridge.db"),
+		CNCDNURL:           getEnv("CNCDN_URL", ""),                    // Optional China CDN URL
+		TurnstileSiteKey:   getEnv("TURNSTILE_SITE_KEY", ""),          // Optional Turnstile site key
+		TurnstileSecretKey: getEnv("TURNSTILE_SECRET_KEY", ""),        // Optional Turnstile secret key
 	}
 	log.Printf("%s Configuration loaded - Port: %s, UploadDir: %s, DatabasePath: %s",
 		shortname, AppConfig.Port, AppConfig.UploadDir, AppConfig.DatabasePath)
