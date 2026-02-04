@@ -50,7 +50,7 @@ function getPhotoUrl(photo) {
 }
 
 function getShareUrl(link) {
-  return `${window.location.origin}/share/${link.token}`
+  return `${window.location.origin}/s/${link.token}`
 }
 
 function copyLink(link) {

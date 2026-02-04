@@ -29,9 +29,13 @@ const routes = [
     meta: { requiresAuth: true }
   },
   {
-    path: '/share/:token',
+    path: '/s/:token',
     name: 'Gallery',
     component: () => import('../views/client/Gallery.vue')
+  },
+  {
+    path: '/share/:token',
+    redirect: to => `/s/${to.params.token}`
   }
 ]
 

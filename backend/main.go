@@ -145,9 +145,9 @@ func main() {
 		}
 	}
 
-	// Short share links (without /api/share prefix)
-	// Example: https://pb.jangit.me/bTfV43AA instead of https://pb.jangit.me/api/share/bTfV43AA
-	shortLinks := r.Group("")
+	// Short share links (with /s prefix)
+	// Example: https://pb.jangit.me/s/bTfV43AA instead of https://pb.jangit.me/api/share/bTfV43AA
+	shortLinks := r.Group("/s")
 	shortLinks.Use(middleware.RequireTurnstile()) // Require verification for first-time visitors
 	{
 		shortLinks.GET("/:token", handlers.GetShareInfo)

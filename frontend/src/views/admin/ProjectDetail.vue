@@ -505,7 +505,7 @@ async function downloadAllFiles() {
 
 // Link functions
 function getShareUrl(link) {
-  return `${window.location.origin}/share/${link.token}`
+  return `${window.location.origin}/s/${link.token}`
 }
 
 const copiedLinkId = ref(null)  // Track which link was copied
@@ -738,7 +738,7 @@ function toggleExclusion(photoId) {
                 <div class="flex items-start justify-between gap-2 mb-2">
                   <div class="min-w-0">
                     <p class="font-medium text-cf-text text-sm truncate">{{ link.alias || '未命名' }}</p>
-                    <p class="text-xs text-cf-muted font-mono truncate">/share/{{ link.token }}</p>
+                    <p class="text-xs text-cf-muted font-mono truncate">/s/{{ link.token }}</p>
                   </div>
                   <div class="flex gap-1">
                     <button
