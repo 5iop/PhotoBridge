@@ -62,15 +62,26 @@ export const getPhotoExif = (token, photoId) => api.get(`/share/${token}/photo/$
 export const getAdminPhotoExif = (photoId) => api.get(`/admin/photos/${photoId}/exif`)
 export const getAdminPhotoFiles = (photoId) => api.get(`/admin/photos/${photoId}/files`)
 
+// Get base URL for uploads/downloads (without /api suffix)
+// This is used for file paths like /uploads/... or /api/share/.../download
 export const getUploadUrl = () => {
+  let baseUrl = ''
+
   if (import.meta.env.VITE_API_URL) {
-    return import.meta.env.VITE_API_URL
+    baseUrl = import.meta.env.VITE_API_URL
+  } else if (import.meta.env.DEV) {
+    // 开发模式下默认使用后端地址
+    baseUrl = 'http://localhost:8060'
   }
-  // 开发模式下默认使用后端地址
-  if (import.meta.env.DEV) {
-    return 'http://localhost:8060'
+
+  // Remove trailing /api to avoid duplication (e.g., /api/api/share/...)
+  // VITE_API_URL is used as axios baseURL which can include /api
+  // But upload/download paths already include /api or /uploads
+  if (baseUrl.endsWith('/api')) {
+    baseUrl = baseUrl.slice(0, -4)
   }
-  return ''
+
+  return baseUrl
 }
 
 // Thumbnail URLs (share routes don't need auth)

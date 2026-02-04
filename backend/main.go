@@ -131,6 +131,8 @@ func main() {
 		}
 
 		// Share routes (public, with Turnstile verification)
+		// API routes: /api/share/:token for programmatic access
+		// Frontend uses /s/:token for short URLs (handled by SPA router)
 		share := api.Group("/share")
 		share.Use(middleware.RequireTurnstile()) // Require verification for first-time visitors
 		{
@@ -143,21 +145,6 @@ func main() {
 			share.GET("/:token/photo/:photoId/thumb/large", handlers.GetSharePhotoThumbLarge)
 			share.GET("/:token/download", handlers.DownloadSharePhotos)
 		}
-	}
-
-	// Short share links (with /s prefix)
-	// Example: https://pb.jangit.me/s/bTfV43AA instead of https://pb.jangit.me/api/share/bTfV43AA
-	shortLinks := r.Group("/s")
-	shortLinks.Use(middleware.RequireTurnstile()) // Require verification for first-time visitors
-	{
-		shortLinks.GET("/:token", handlers.GetShareInfo)
-		shortLinks.GET("/:token/photos", handlers.GetSharePhotos)
-		shortLinks.GET("/:token/photo/:photoId", handlers.GetSharePhoto)
-		shortLinks.GET("/:token/photo/:photoId/exif", handlers.GetPhotoExif)
-		shortLinks.GET("/:token/photo/:photoId/download", handlers.DownloadSinglePhoto)
-		shortLinks.GET("/:token/photo/:photoId/thumb/small", handlers.GetSharePhotoThumbSmall)
-		shortLinks.GET("/:token/photo/:photoId/thumb/large", handlers.GetSharePhotoThumbLarge)
-		shortLinks.GET("/:token/download", handlers.DownloadSharePhotos)
 	}
 
 	// Serve index.html for all non-API routes (SPA support)

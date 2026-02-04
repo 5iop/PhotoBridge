@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -33,6 +34,11 @@ func JWTAuth() gin.HandlerFunc {
 
 		claims := &Claims{}
 		token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
+			// Verify that the signing method is HMAC (HS256/HS384/HS512)
+			// This prevents algorithm confusion attacks (e.g., RS256 -> HS256)
+			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+				return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+			}
 			return []byte(config.AppConfig.JWTSecret), nil
 		})
 

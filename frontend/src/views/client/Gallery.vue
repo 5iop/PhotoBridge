@@ -3,6 +3,7 @@ import { ref, reactive, onMounted, computed, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 import * as api from '../../api'
 import { getUploadUrl, getShareThumbSmallUrl, getShareThumbLargeUrl } from '../../api'
+import TurnstileVerification from '../../components/TurnstileVerification.vue'
 
 const route = useRoute()
 
@@ -10,6 +11,8 @@ const info = ref(null)
 const photos = ref([])
 const loading = ref(true)
 const error = ref('')
+const showTurnstile = ref(false)
+const turnstileSiteKey = ref('')
 
 // 跟踪缩略图加载失败的照片
 const failedThumbs = reactive(new Set())
@@ -57,10 +60,22 @@ async function fetchData() {
       console.log(`CDN域名: ${info.value.cdn_base_url}`)
     }
   } catch (err) {
+    // Check if verification is required
+    if (err.response?.status === 403 && err.response?.data?.error === 'verification_required') {
+      turnstileSiteKey.value = err.response.data.turnstile_key
+      showTurnstile.value = true
+      loading.value = false
+      return
+    }
     error.value = err.response?.data?.error || '加载失败'
   } finally {
     loading.value = false
   }
+}
+
+function handleVerified() {
+  showTurnstile.value = false
+  fetchData()
 }
 
 function getPhotoUrl(photo) {
@@ -261,7 +276,12 @@ function getExtLabel(ext) {
 
 function downloadFile(url, filename) {
   const a = document.createElement('a')
-  a.href = getUploadUrl() + url
+  // Check if URL is already absolute (starts with http:// or https://)
+  if (url.startsWith('http://') || url.startsWith('https://')) {
+    a.href = url
+  } else {
+    a.href = getUploadUrl() + url
+  }
   a.download = filename
   document.body.appendChild(a)
   a.click()
@@ -341,6 +361,13 @@ function download() {
 
 <template>
   <div class="min-h-screen">
+    <!-- Turnstile Verification -->
+    <TurnstileVerification
+      v-if="showTurnstile"
+      :siteKey="turnstileSiteKey"
+      @verified="handleVerified"
+    />
+
     <!-- Loading -->
     <div v-if="loading" class="min-h-screen flex items-center justify-center">
       <svg class="w-12 h-12 text-primary-500 spinner" fill="none" viewBox="0 0 24 24">

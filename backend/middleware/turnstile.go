@@ -82,15 +82,19 @@ func VerifyTurnstileHandler(c *gin.Context) {
 		return
 	}
 
+	// Determine if cookie should be Secure based on request protocol
+	// Check TLS or X-Forwarded-Proto header (for reverse proxies)
+	isSecure := c.Request.TLS != nil || c.GetHeader("X-Forwarded-Proto") == "https"
+
 	// Set verification cookie (30 days)
 	c.SetCookie(
 		verificationCookieName,
 		utils.GenerateVerificationCookie(),
 		cookieMaxAge,
 		"/",
-		"",      // domain (empty = current domain)
-		true,    // secure (HTTPS only)
-		true,    // httpOnly (not accessible via JavaScript)
+		"",        // domain (empty = current domain)
+		isSecure,  // secure (HTTPS only when appropriate)
+		true,      // httpOnly (not accessible via JavaScript)
 	)
 
 	// Add debug header
