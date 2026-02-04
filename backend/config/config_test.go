@@ -216,3 +216,112 @@ func TestConfigStructFields(t *testing.T) {
 		t.Error("DatabasePath field not set correctly")
 	}
 }
+
+func TestIsCDNIP_StripPort(t *testing.T) {
+	cfg := &Config{
+		cdnIPSet: make(map[string]bool),
+	}
+
+	// Add IP without port
+	cfg.AddCDNIP("1.2.3.4")
+
+	tests := []struct {
+		name     string
+		input    string
+		expected bool
+	}{
+		{"exact match", "1.2.3.4", true},
+		{"with port", "1.2.3.4:8080", true},
+		{"different IP", "5.6.7.8", false},
+		{"different IP with port", "5.6.7.8:8080", false},
+		{"IPv6 (not stripped)", "2001:db8::1:8080", false}, // IPv6 with multiple colons is not stripped
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := cfg.IsCDNIP(tt.input)
+			if result != tt.expected {
+				t.Errorf("IsCDNIP(%q) = %v, expected %v", tt.input, result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestAddCDNIP(t *testing.T) {
+	cfg := &Config{
+		cdnIPSet: make(map[string]bool),
+	}
+
+	// Initially should be empty
+	if cfg.IsCDNIP("1.2.3.4") {
+		t.Error("IP should not be in whitelist initially")
+	}
+
+	// Add IP
+	cfg.AddCDNIP("1.2.3.4")
+
+	// Should now be whitelisted
+	if !cfg.IsCDNIP("1.2.3.4") {
+		t.Error("IP should be whitelisted after AddCDNIP")
+	}
+
+	// Adding duplicate should be idempotent
+	cfg.AddCDNIP("1.2.3.4")
+	if !cfg.IsCDNIP("1.2.3.4") {
+		t.Error("IP should still be whitelisted")
+	}
+}
+
+func TestAddCDNIP_Multiple(t *testing.T) {
+	cfg := &Config{
+		cdnIPSet: make(map[string]bool),
+	}
+
+	ips := []string{"1.2.3.4", "5.6.7.8", "9.10.11.12"}
+
+	// Add multiple IPs
+	for _, ip := range ips {
+		cfg.AddCDNIP(ip)
+	}
+
+	// All should be whitelisted
+	for _, ip := range ips {
+		if !cfg.IsCDNIP(ip) {
+			t.Errorf("IP %s should be whitelisted", ip)
+		}
+	}
+
+	// Non-added IP should not be whitelisted
+	if cfg.IsCDNIP("13.14.15.16") {
+		t.Error("Non-added IP should not be whitelisted")
+	}
+}
+
+func TestRefreshCDNIPs_NoDuplicates(t *testing.T) {
+	cfg := &Config{
+		cdnIPSet: make(map[string]bool),
+		CNCDNURL: "",
+	}
+
+	// Manually add some IPs to simulate previous refresh
+	cfg.AddCDNIP("1.2.3.4")
+	cfg.AddCDNIP("5.6.7.8")
+
+	// Simulate refreshCDNIPs adding overlapping IPs
+	// Note: Since we can't easily mock DNS resolution, we test the deduplication logic
+	// by directly manipulating the set
+	existingIP := "1.2.3.4"
+	newIP := "9.10.11.12"
+
+	// The set should handle duplicates
+	cfg.AddCDNIP(existingIP) // Re-adding should be safe
+	cfg.AddCDNIP(newIP)      // Adding new IP
+
+	// Both should be present
+	if !cfg.IsCDNIP(existingIP) {
+		t.Errorf("Existing IP %s should still be whitelisted", existingIP)
+	}
+	if !cfg.IsCDNIP(newIP) {
+		t.Errorf("New IP %s should be whitelisted", newIP)
+	}
+}

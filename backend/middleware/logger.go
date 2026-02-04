@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"time"
 
+	"photobridge/config"
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -56,17 +58,23 @@ func Logger() gin.HandlerFunc {
 		// Get real IP
 		realIP := GetRealIP(c)
 
-		// Get Cloudflare headers for debugging
-		cfRay := c.GetHeader("CF-Ray")
-		cfCountry := c.GetHeader("CF-IPCountry")
-		cfCacheStatus := c.GetHeader("CF-Cache-Status")
+		// Check if request is from CDN
+		isFromCDN := config.AppConfig != nil && config.AppConfig.IsCDNIP(realIP)
 
-		// Add Cloudflare debugging headers to response (helpful for frontend debugging)
-		if cfRay != "" {
-			c.Header("X-CF-Ray", cfRay)
-		}
-		if cfCacheStatus != "" {
-			c.Header("X-CF-Cache-Status", cfCacheStatus)
+		// Get Cloudflare headers for debugging (only if not from CDN)
+		var cfRay, cfCountry, cfCacheStatus string
+		if !isFromCDN {
+			cfRay = c.GetHeader("CF-Ray")
+			cfCountry = c.GetHeader("CF-IPCountry")
+			cfCacheStatus = c.GetHeader("CF-Cache-Status")
+
+			// Add Cloudflare debugging headers to response (helpful for frontend debugging)
+			if cfRay != "" {
+				c.Header("X-CF-Ray", cfRay)
+			}
+			if cfCacheStatus != "" {
+				c.Header("X-CF-Cache-Status", cfCacheStatus)
+			}
 		}
 
 		// Process request
@@ -92,18 +100,22 @@ func Logger() gin.HandlerFunc {
 			logMsg += "?" + raw
 		}
 
-		// Add Cloudflare info if available
-		cfInfo := ""
-		if cfCountry != "" {
-			cfInfo += fmt.Sprintf(" | Country: %s", cfCountry)
-		}
-		if cfRay != "" {
-			cfInfo += fmt.Sprintf(" | Ray: %s", cfRay)
-		}
-		if cfCacheStatus != "" {
-			cfInfo += fmt.Sprintf(" | Cache: %s", cfCacheStatus)
-		}
-		if cfInfo != "" {
+		// Add source info
+		if isFromCDN {
+			// Request from CDN - show CDN marker
+			logMsg += " | Source: CDN"
+		} else if cfRay != "" || cfCountry != "" || cfCacheStatus != "" {
+			// Request through Cloudflare - show CF info
+			cfInfo := ""
+			if cfCountry != "" {
+				cfInfo += fmt.Sprintf(" | Country: %s", cfCountry)
+			}
+			if cfRay != "" {
+				cfInfo += fmt.Sprintf(" | Ray: %s", cfRay)
+			}
+			if cfCacheStatus != "" {
+				cfInfo += fmt.Sprintf(" | Cache: %s", cfCacheStatus)
+			}
 			logMsg += cfInfo
 		}
 

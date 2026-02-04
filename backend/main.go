@@ -68,6 +68,9 @@ func main() {
 			c.JSON(http.StatusOK, gin.H{"status": "ok"})
 		})
 
+		// Turnstile verification endpoint (public)
+		api.POST("/verify", middleware.VerifyTurnstileHandler)
+
 		// Swagger UI and OpenAPI spec
 		api.GET("/docs", func(c *gin.Context) {
 			c.File("./docs/swagger.html")
@@ -120,8 +123,9 @@ func main() {
 			apiKey.GET("/projects/:project/photos", handlers.GetProjectPhotosViaAPI)
 		}
 
-		// Share routes (public)
+		// Share routes (public, with Turnstile verification)
 		share := api.Group("/share")
+		share.Use(middleware.RequireTurnstile()) // Require verification for first-time visitors
 		{
 			share.GET("/:token", handlers.GetShareInfo)
 			share.GET("/:token/photos", handlers.GetSharePhotos)
