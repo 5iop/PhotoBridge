@@ -15,13 +15,11 @@ import (
 // serveThumb is a unified handler for serving thumbnails
 // size: "small" or "large"
 func serveThumb(c *gin.Context, photo *models.Photo, size string) {
-	// 如果只有RAW没有普通图片
 	if photo.NormalExt == "" {
-		c.JSON(http.StatusNotFound, gin.H{"error": "raw_only", "message": "只有RAW文件"})
+		c.JSON(http.StatusNotFound, gin.H{"error": "raw_only", "message": "Only RAW file exists"})
 		return
 	}
 
-	// 获取对应大小的缩略图数据
 	var thumbData []byte
 	if size == "small" {
 		thumbData = photo.ThumbSmall
@@ -29,7 +27,6 @@ func serveThumb(c *gin.Context, photo *models.Photo, size string) {
 		thumbData = photo.ThumbLarge
 	}
 
-	// 如果没有缩略图，加入队列生成
 	if len(thumbData) == 0 {
 		var project models.Project
 		if err := database.DB.First(&project, photo.ProjectID).Error; err != nil {
@@ -37,36 +34,44 @@ func serveThumb(c *gin.Context, photo *models.Photo, size string) {
 			return
 		}
 
-		// 加入生成队列
-		if services.Queue != nil {
-			services.Queue.Enqueue(photo, project.Name)
+		if services.Queue == nil || !services.Queue.IsRunning() {
+			c.JSON(http.StatusServiceUnavailable, gin.H{
+				"error":   "queue_unavailable",
+				"message": "Thumbnail service unavailable, please retry later",
+				"queued":  false,
+			})
+			return
+		}
+
+		enqueued := services.Queue.Enqueue(photo, project.Name)
+		if !enqueued && !services.Queue.IsProcessing(photo.ID) {
+			c.JSON(http.StatusTooManyRequests, gin.H{
+				"error":   "queue_busy",
+				"message": "Thumbnail queue is full, please retry later",
+				"queued":  false,
+			})
+			return
 		}
 
 		c.JSON(http.StatusAccepted, gin.H{
 			"error":   "generating",
-			"message": "缩略图生成中，请稍后重试",
-			"queued":  services.Queue != nil && services.Queue.IsProcessing(photo.ID),
+			"message": "Thumbnail is being generated, please retry later",
+			"queued":  services.Queue.IsProcessing(photo.ID),
 		})
 		return
 	}
 
-	// Generate ETag based on photo ID, update time, and size
 	etag := utils.GenerateETag(photo.ID, photo.UpdatedAt, size)
 
-	// Set caching headers
 	c.Header("ETag", etag)
 	c.Header("Cache-Control", "public, max-age=31536000")
-	// Tell Cloudflare to cache different versions based on Accept header
-	// This is important when serving different formats (JPEG, WebP, AVIF) in the future
 	c.Header("Vary", "Accept")
 
-	// Check if client has fresh cache (If-None-Match header)
 	if clientETag := c.GetHeader("If-None-Match"); clientETag != "" && clientETag == etag {
 		c.Status(http.StatusNotModified)
 		return
 	}
 
-	// Return thumbnail image
 	c.Header("Content-Type", "image/jpeg")
 	c.Data(http.StatusOK, "image/jpeg", thumbData)
 }
@@ -95,14 +100,12 @@ func getSharePhoto(c *gin.Context) (*models.Photo, bool) {
 		return nil, false
 	}
 
-	// 验证分享链接（不预加载 Exclusions，按需查询）
 	var link models.ShareLink
 	if err := database.DB.Where("token = ?", token).First(&link).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Share link not found"})
 		return nil, false
 	}
 
-	// 只检查这一张照片是否被排除（优化：直接查询而非加载所有排除项）
 	var exclusionCount int64
 	database.DB.Model(&models.PhotoExclusion{}).Where("link_id = ? AND photo_id = ?", link.ID, photoIDUint).Count(&exclusionCount)
 	if exclusionCount > 0 {
@@ -119,7 +122,7 @@ func getSharePhoto(c *gin.Context) (*models.Photo, bool) {
 	return &photo, true
 }
 
-// GetPhotoThumbSmall 获取列表用小缩略图
+// GetPhotoThumbSmall returns small thumbnail for list view.
 func GetPhotoThumbSmall(c *gin.Context) {
 	photo, ok := getAdminPhoto(c)
 	if !ok {
@@ -128,7 +131,7 @@ func GetPhotoThumbSmall(c *gin.Context) {
 	serveThumb(c, photo, "small")
 }
 
-// GetPhotoThumbLarge 获取预览用大缩略图
+// GetPhotoThumbLarge returns large thumbnail for preview.
 func GetPhotoThumbLarge(c *gin.Context) {
 	photo, ok := getAdminPhoto(c)
 	if !ok {
@@ -137,7 +140,7 @@ func GetPhotoThumbLarge(c *gin.Context) {
 	serveThumb(c, photo, "large")
 }
 
-// GetSharePhotoThumbSmall 分享页面获取小缩略图
+// GetSharePhotoThumbSmall returns small thumbnail for share page.
 func GetSharePhotoThumbSmall(c *gin.Context) {
 	photo, ok := getSharePhoto(c)
 	if !ok {
@@ -146,7 +149,7 @@ func GetSharePhotoThumbSmall(c *gin.Context) {
 	serveThumb(c, photo, "small")
 }
 
-// GetSharePhotoThumbLarge 分享页面获取大缩略图
+// GetSharePhotoThumbLarge returns large thumbnail for share page.
 func GetSharePhotoThumbLarge(c *gin.Context) {
 	photo, ok := getSharePhoto(c)
 	if !ok {

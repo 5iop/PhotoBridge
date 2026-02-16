@@ -49,6 +49,8 @@ services:
       - PORT=80
       - GIN_MODE=release
       - CNCDN_URL=${CNCDN_URL:-}
+      - THUMB_WORKERS=${THUMB_WORKERS:-2}
+      - THUMB_JOB_TIMEOUT_SECONDS=${THUMB_JOB_TIMEOUT_SECONDS:-120}
     volumes:
       - ./photobridge/data:/app/data
       - ./uploads:/app/uploads

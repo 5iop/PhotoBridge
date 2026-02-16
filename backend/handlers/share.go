@@ -18,13 +18,13 @@ import (
 )
 
 type ShareInfoResponse struct {
-	ProjectName  string  `json:"project_name"`
-	Description  string  `json:"description"`
-	Alias        string  `json:"alias"`
-	AllowRaw     bool    `json:"allow_raw"`
-	PhotoCount   int     `json:"photo_count"`
-	CDNBaseURL   string  `json:"cdn_base_url"`           // CDN base URL for China users, empty if not applicable
-	Country      *string `json:"country"`                // Client's country code from CF-IPCountry header, null if not available
+	ProjectName string  `json:"project_name"`
+	Description string  `json:"description"`
+	Alias       string  `json:"alias"`
+	AllowRaw    bool    `json:"allow_raw"`
+	PhotoCount  int     `json:"photo_count"`
+	CDNBaseURL  string  `json:"cdn_base_url"` // CDN base URL for China users, empty if not applicable
+	Country     *string `json:"country"`      // Client's country code from CF-IPCountry header, null if not available
 }
 
 func GetShareInfo(c *gin.Context) {
@@ -96,7 +96,7 @@ func GetSharePhotos(c *gin.Context) {
 	excludedIDs := common.GetExcludedIDs(link.Exclusions)
 
 	var photos []models.Photo
-	query := database.DB.Where("project_id = ?", link.ProjectID)
+	query := database.DB.Select(photoMetaColumns).Where("project_id = ?", link.ProjectID)
 	if len(excludedIDs) > 0 {
 		query = query.Where("id NOT IN ?", excludedIDs)
 	}
@@ -164,7 +164,8 @@ func GetSharePhoto(c *gin.Context) {
 
 	var photo models.Photo
 	// 验证照片属于该分享链接的项目
-	if err := database.DB.Where("id = ? AND project_id = ?", photoIDUint, link.ProjectID).First(&photo).Error; err != nil {
+	if err := database.DB.Select("id, project_id, base_name, normal_ext, raw_ext, has_raw").
+		Where("id = ? AND project_id = ?", photoIDUint, link.ProjectID).First(&photo).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Photo not found"})
 		return
 	}
@@ -246,7 +247,8 @@ func DownloadSinglePhoto(c *gin.Context) {
 	}
 
 	var photo models.Photo
-	if err := database.DB.Where("id = ? AND project_id = ?", photoIDUint, link.ProjectID).First(&photo).Error; err != nil {
+	if err := database.DB.Select("id, project_id, base_name, normal_ext, raw_ext, has_raw").
+		Where("id = ? AND project_id = ?", photoIDUint, link.ProjectID).First(&photo).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Photo not found"})
 		return
 	}
@@ -355,7 +357,7 @@ func DownloadSharePhotos(c *gin.Context) {
 	excludedIDs := common.GetExcludedIDs(link.Exclusions)
 
 	var photos []models.Photo
-	query := database.DB.Where("project_id = ?", link.ProjectID)
+	query := database.DB.Select("base_name, normal_ext, raw_ext, has_raw").Where("project_id = ?", link.ProjectID)
 	if len(excludedIDs) > 0 {
 		query = query.Where("id NOT IN ?", excludedIDs)
 	}

@@ -5,6 +5,7 @@ import (
 	"net"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -18,11 +19,13 @@ type Config struct {
 	Port               string
 	UploadDir          string
 	DatabasePath       string
-	CNCDNURL           string              // China CDN URL (e.g., https://cdn.pb.jangit.me)
-	cdnIPSet           map[string]bool     // CDN server IPs (set for O(1) lookup, only grows)
-	cdnIPMutex         sync.RWMutex        // Protects cdnIPSet
-	TurnstileSiteKey   string              // Cloudflare Turnstile site key (public)
-	TurnstileSecretKey string              // Cloudflare Turnstile secret key (private)
+	CNCDNURL           string          // China CDN URL (e.g., https://cdn.pb.jangit.me)
+	cdnIPSet           map[string]bool // CDN server IPs (set for O(1) lookup, only grows)
+	cdnIPMutex         sync.RWMutex    // Protects cdnIPSet
+	TurnstileSiteKey   string          // Cloudflare Turnstile site key (public)
+	TurnstileSecretKey string          // Cloudflare Turnstile secret key (private)
+	ThumbWorkers       int             // Number of thumbnail workers
+	ThumbJobTimeoutSec int             // Per-thumbnail job timeout in seconds
 }
 
 var AppConfig *Config
@@ -42,10 +45,12 @@ func Load() {
 		Port:               getEnv("PORT", "8060"),
 		UploadDir:          getEnv("UPLOAD_DIR", "./uploads"),
 		DatabasePath:       getEnv("DATABASE_PATH", "./data/photobridge.db"),
-		CNCDNURL:           cdnURL,                           // Optional China CDN URL
-		cdnIPSet:           make(map[string]bool),            // Initialize CDN IP set
-		TurnstileSiteKey:   getEnv("TURNSTILE_SITE_KEY", ""), // Optional Turnstile site key
+		CNCDNURL:           cdnURL,                             // Optional China CDN URL
+		cdnIPSet:           make(map[string]bool),              // Initialize CDN IP set
+		TurnstileSiteKey:   getEnv("TURNSTILE_SITE_KEY", ""),   // Optional Turnstile site key
 		TurnstileSecretKey: getEnv("TURNSTILE_SECRET_KEY", ""), // Optional Turnstile secret key
+		ThumbWorkers:       getEnvInt("THUMB_WORKERS", 2, 1),
+		ThumbJobTimeoutSec: getEnvInt("THUMB_JOB_TIMEOUT_SECONDS", 120, 0),
 	}
 	log.Printf("%s Configuration loaded - Port: %s, UploadDir: %s, DatabasePath: %s",
 		shortname, AppConfig.Port, AppConfig.UploadDir, AppConfig.DatabasePath)
@@ -74,6 +79,24 @@ func getEnv(key, defaultValue string) string {
 		return value
 	}
 	return defaultValue
+}
+
+func getEnvInt(key string, defaultValue int, minValue int) int {
+	value := os.Getenv(key)
+	if value == "" {
+		return defaultValue
+	}
+
+	parsed, err := strconv.Atoi(value)
+	if err != nil {
+		log.Printf("%s Invalid %s=%q, using default %d", shortname, key, value, defaultValue)
+		return defaultValue
+	}
+	if parsed < minValue {
+		log.Printf("%s %s=%d is below minimum %d, using default %d", shortname, key, parsed, minValue, defaultValue)
+		return defaultValue
+	}
+	return parsed
 }
 
 // refreshCDNIPs resolves CDN IPs and adds them to the set (never removes)

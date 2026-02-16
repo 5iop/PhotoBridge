@@ -3,21 +3,28 @@ package utils
 import (
 	"bytes"
 	"image"
+	_ "image/gif"
 	"image/jpeg"
 	_ "image/png"
 	"os"
 
 	"github.com/disintegration/imaging"
+	_ "golang.org/x/image/bmp"
+	_ "golang.org/x/image/tiff"
+	_ "golang.org/x/image/webp"
 )
 
 const (
-	ThumbSmallWidth   = 400  // 列表缩略图宽度
-	ThumbLargeWidth   = 1600 // 预览缩略图宽度
-	JpegQualitySmall  = 75   // 小缩略图JPEG质量 (lower quality acceptable at small size)
-	JpegQualityLarge  = 85   // 大缩略图JPEG质量
+	ThumbSmallWidth  = 400
+	ThumbLargeWidth  = 1600
+	JpegQualitySmall = 75
+	JpegQualityLarge = 85
+
+	// For very large images, pre-shrink to reduce peak memory and resize cost.
+	preShrinkMaxLongSide = ThumbLargeWidth * 2
 )
 
-// ThumbnailResult 缩略图生成结果
+// ThumbnailResult contains generated thumbnails and source dimensions.
 type ThumbnailResult struct {
 	Small       []byte
 	Large       []byte
@@ -27,34 +34,54 @@ type ThumbnailResult struct {
 	SmallHeight int
 }
 
-// GenerateThumbnails 从图片文件生成两种尺寸的缩略图
+// GenerateThumbnails creates small and large JPEG thumbnails from an image file.
 func GenerateThumbnails(imagePath string) (*ThumbnailResult, error) {
-	// 打开原图
 	file, err := os.Open(imagePath)
 	if err != nil {
 		return nil, err
 	}
 	defer file.Close()
 
-	// 解码图片
+	cfg, _, err := image.DecodeConfig(file)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := file.Seek(0, 0); err != nil {
+		return nil, err
+	}
+
 	img, _, err := image.Decode(file)
 	if err != nil {
 		return nil, err
 	}
 
-	bounds := img.Bounds()
-	originalWidth := bounds.Dx()
-	originalHeight := bounds.Dy()
-
 	result := &ThumbnailResult{
-		Width:  originalWidth,
-		Height: originalHeight,
+		Width:  cfg.Width,
+		Height: cfg.Height,
 	}
 
-	// 生成小缩略图 (用于列表)
-	// Use Box filter for small thumbnails - 10-50x faster, quality difference
-	// is not noticeable at small sizes
-	smallImg := imaging.Resize(img, ThumbSmallWidth, 0, imaging.Box)
+	working := img
+	longSide := cfg.Width
+	if cfg.Height > longSide {
+		longSide = cfg.Height
+	}
+	if longSide > preShrinkMaxLongSide {
+		// Pre-shrink huge images across all formats to lower memory/CPU in later stages.
+		if cfg.Width >= cfg.Height {
+			working = imaging.Resize(img, preShrinkMaxLongSide, 0, imaging.Box)
+		} else {
+			working = imaging.Resize(img, 0, preShrinkMaxLongSide, imaging.Box)
+		}
+		img = nil
+	}
+
+	largeWidth := ThumbLargeWidth
+	if cfg.Width < largeWidth {
+		largeWidth = cfg.Width
+	}
+	largeImg := imaging.Resize(working, largeWidth, 0, imaging.CatmullRom)
+
+	smallImg := imaging.Resize(largeImg, ThumbSmallWidth, 0, imaging.Box)
 	smallBounds := smallImg.Bounds()
 	result.SmallWidth = smallBounds.Dx()
 	result.SmallHeight = smallBounds.Dy()
@@ -64,17 +91,8 @@ func GenerateThumbnails(imagePath string) (*ThumbnailResult, error) {
 		return nil, err
 	}
 	result.Small = smallBuf.Bytes()
-	smallImg = nil // Release memory before creating large thumbnail
+	smallImg = nil
 
-	// 生成大缩略图 (用于预览)
-	// 如果原图小于预览尺寸，则使用原图尺寸
-	largeWidth := ThumbLargeWidth
-	if originalWidth < largeWidth {
-		largeWidth = originalWidth
-	}
-
-	// Use CatmullRom for large thumbnails - faster than Lanczos, good quality
-	largeImg := imaging.Resize(img, largeWidth, 0, imaging.CatmullRom)
 	var largeBuf bytes.Buffer
 	if err := jpeg.Encode(&largeBuf, largeImg, &jpeg.Options{Quality: JpegQualityLarge}); err != nil {
 		return nil, err

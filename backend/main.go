@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"time"
 
 	"photobridge/config"
 	"photobridge/database"
@@ -31,14 +32,17 @@ func main() {
 	database.Init()
 
 	// Initialize thumbnail generation queue
-	// Workers: 2 (concurrent thumbnail generators)
+	// Workers and timeout are configurable via environment variables.
 	// Queue is unbounded - tasks only store file paths, not image data
-	services.InitQueue(2)
+	services.InitQueue(
+		config.AppConfig.ThumbWorkers,
+		time.Duration(config.AppConfig.ThumbJobTimeoutSec)*time.Second,
+	)
 
 	// Create Gin router with custom middleware
 	r := gin.New()
-	r.Use(gin.Recovery())            // Recover from panics
-	r.Use(middleware.Logger())       // Custom logger with real IP and health check filtering
+	r.Use(gin.Recovery())      // Recover from panics
+	r.Use(middleware.Logger()) // Custom logger with real IP and health check filtering
 
 	// Set max memory for multipart forms to 8MB
 	// Files larger than this will be stored in temp files on disk

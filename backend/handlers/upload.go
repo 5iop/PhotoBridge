@@ -18,6 +18,8 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+const photoMetaColumns = "id, project_id, base_name, normal_ext, raw_ext, has_raw, file_hash, normal_hash, raw_hash, thumb_width, thumb_height, created_at, updated_at"
+
 // processUploadedFile handles the common logic for processing an uploaded file
 // Returns the photo model and any error
 func processUploadedFile(c *gin.Context, file *multipart.FileHeader, project *models.Project, uploadDir string) (*models.Photo, error) {
@@ -38,12 +40,12 @@ func processUploadedFile(c *gin.Context, file *multipart.FileHeader, project *mo
 	isRaw := models.IsRawExtension(ext)
 	if isRaw {
 		// Check raw_hash field for RAW files
-		if err := database.DB.Where("project_id = ? AND raw_hash = ?", project.ID, fileHash).First(&existingByHash).Error; err == nil {
+		if err := database.DB.Select(photoMetaColumns).Where("project_id = ? AND raw_hash = ?", project.ID, fileHash).First(&existingByHash).Error; err == nil {
 			return &existingByHash, nil
 		}
 	} else {
 		// Check normal_hash and file_hash (backward compatibility) for normal images
-		if err := database.DB.Where("project_id = ? AND (normal_hash = ? OR file_hash = ?)", project.ID, fileHash, fileHash).First(&existingByHash).Error; err == nil {
+		if err := database.DB.Select(photoMetaColumns).Where("project_id = ? AND (normal_hash = ? OR file_hash = ?)", project.ID, fileHash, fileHash).First(&existingByHash).Error; err == nil {
 			return &existingByHash, nil
 		}
 	}
@@ -79,29 +81,33 @@ func processUploadedFile(c *gin.Context, file *multipart.FileHeader, project *mo
 
 	// Check if photo with same base name exists
 	var existingPhoto models.Photo
-	result := database.DB.Where("project_id = ? AND base_name = ?", project.ID, baseName).First(&existingPhoto)
+	result := database.DB.Select(photoMetaColumns).Where("project_id = ? AND base_name = ?", project.ID, baseName).First(&existingPhoto)
 
 	if result.Error == nil {
-		// Update existing photo
+		updates := map[string]interface{}{}
 		if models.IsRawExtension(ext) {
-			existingPhoto.RawExt = ext
-			existingPhoto.HasRaw = true
-			existingPhoto.RawHash = fileHash
+			updates["raw_ext"] = ext
+			updates["has_raw"] = true
+			updates["raw_hash"] = fileHash
 		} else if models.IsImageExtension(ext) {
-			existingPhoto.NormalExt = ext
-			existingPhoto.NormalHash = fileHash
-			existingPhoto.FileHash = fileHash // Keep for backward compatibility
-			// 清除旧缩略图，浏览时会按需重新生成
-			existingPhoto.ThumbSmall = nil
-			existingPhoto.ThumbLarge = nil
-			existingPhoto.ThumbWidth = 0
-			existingPhoto.ThumbHeight = 0
+			updates["normal_ext"] = ext
+			updates["normal_hash"] = fileHash
+			updates["file_hash"] = fileHash // Keep for backward compatibility
+			updates["thumb_small"] = nil
+			updates["thumb_large"] = nil
+			updates["thumb_width"] = 0
+			updates["thumb_height"] = 0
 		}
-		database.DB.Save(&existingPhoto)
+		if len(updates) > 0 {
+			if err := database.DB.Model(&models.Photo{}).Where("id = ?", existingPhoto.ID).Updates(updates).Error; err != nil {
+				return nil, err
+			}
+			_ = database.DB.Select(photoMetaColumns).First(&existingPhoto, existingPhoto.ID).Error
+		}
 		return &existingPhoto, nil
 	}
 
-	// Create new photo (不生成缩略图，浏览时按需生成)
+	// Create new photo (涓嶇敓鎴愮缉鐣ュ浘锛屾祻瑙堟椂鎸夐渶鐢熸垚)
 	photo := models.Photo{
 		ProjectID: project.ID,
 		BaseName:  baseName,
@@ -206,7 +212,7 @@ func UploadPhotos(c *gin.Context) {
 func UploadViaAPI(c *gin.Context) {
 	projectName := c.Param("project")
 
-	// 验证项目名称安全性（防止路径遍历攻击）
+	// 楠岃瘉椤圭洰鍚嶇О瀹夊叏鎬э紙闃叉璺緞閬嶅巻鏀诲嚮锛?
 	sanitizedName, valid := utils.SanitizeProjectName(projectName)
 	if !valid {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid project name"})
@@ -260,7 +266,7 @@ func GetProjectPhotos(c *gin.Context) {
 	projectID := c.Param("id")
 	var photos []models.Photo
 
-	result := database.DB.Where("project_id = ?", projectID).Find(&photos)
+	result := database.DB.Select(photoMetaColumns).Where("project_id = ?", projectID).Find(&photos)
 	if result.Error != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": result.Error.Error()})
 		return
@@ -329,7 +335,8 @@ func GetProjectPhotosViaAPI(c *gin.Context) {
 
 	// Get photos
 	var photos []models.Photo
-	database.DB.Where("project_id = ?", project.ID).Find(&photos)
+	database.DB.Select("id, base_name, normal_ext, raw_ext, has_raw, file_hash, created_at").
+		Where("project_id = ?", project.ID).Find(&photos)
 
 	// Build response
 	type PhotoInfo struct {
@@ -494,8 +501,9 @@ func CheckHashes(c *gin.Context) {
 
 	// Query existing hashes - check normal_hash, raw_hash, and file_hash (backward compatibility)
 	var existingPhotos []models.Photo
-	database.DB.Where("project_id = ? AND (normal_hash IN ? OR raw_hash IN ? OR file_hash IN ?)",
-		project.ID, req.Hashes, req.Hashes, req.Hashes).Find(&existingPhotos)
+	database.DB.Select("normal_hash, raw_hash, file_hash").
+		Where("project_id = ? AND (normal_hash IN ? OR raw_hash IN ? OR file_hash IN ?)",
+			project.ID, req.Hashes, req.Hashes, req.Hashes).Find(&existingPhotos)
 
 	existingSet := make(map[string]bool)
 	for _, photo := range existingPhotos {

@@ -1,9 +1,12 @@
 package services
 
 import (
+	"errors"
 	"log"
 	"path/filepath"
+	"runtime/debug"
 	"sync"
+	"time"
 
 	"photobridge/config"
 	"photobridge/database"
@@ -15,6 +18,8 @@ const (
 	shortname      = "[ThumbQueue]"
 	maxQueueLength = 1000 // Limit queue length to prevent memory exhaustion
 )
+
+var ErrThumbnailTimeout = errors.New("thumbnail generation timeout")
 
 // ThumbTask represents a thumbnail generation task (only stores path info, not image data)
 type ThumbTask struct {
@@ -31,6 +36,7 @@ type ThumbQueue struct {
 	cond       *sync.Cond
 	processing sync.Map // Track which photos are being processed or queued
 	workers    int
+	jobTimeout time.Duration
 	running    bool
 	stopCh     chan struct{}
 	wg         sync.WaitGroup
@@ -42,16 +48,17 @@ var (
 )
 
 // InitQueue initializes the global thumbnail queue
-func InitQueue(workers int) {
+func InitQueue(workers int, jobTimeout time.Duration) {
 	q := &ThumbQueue{
-		tasks:   make([]ThumbTask, 0),
-		workers: workers,
-		stopCh:  make(chan struct{}),
+		tasks:      make([]ThumbTask, 0),
+		workers:    workers,
+		jobTimeout: jobTimeout,
+		stopCh:     make(chan struct{}),
 	}
 	q.cond = sync.NewCond(&q.tasksMu)
 	q.Start()
 	Queue = q
-	log.Printf("%s Initialized with %d workers (unbounded queue)", shortname, workers)
+	log.Printf("%s Initialized with %d workers, timeout=%s", shortname, workers, jobTimeout)
 }
 
 // Start begins the worker goroutines
@@ -93,10 +100,22 @@ func (q *ThumbQueue) worker(id int) {
 		q.tasksMu.Unlock()
 
 		// Process task
-		q.processTask(task)
+		q.processTaskSafely(task, id)
 	}
 
 	log.Printf("%s Worker %d stopped", shortname, id)
+}
+
+// processTaskSafely ensures a panic in one task does not kill the worker.
+func (q *ThumbQueue) processTaskSafely(task ThumbTask, workerID int) {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("%s Worker %d panic while processing photo %d: %v\n%s",
+				shortname, workerID, task.PhotoID, r, string(debug.Stack()))
+			q.processing.Delete(task.PhotoID)
+		}
+	}()
+	q.processTask(task)
 }
 
 // processTask generates thumbnails for a single photo from file path
@@ -123,7 +142,7 @@ func (q *ThumbQueue) processTask(task ThumbTask) {
 		return
 	}
 
-	thumbResult, err := utils.GenerateThumbnails(safeImagePath)
+	thumbResult, err := q.generateWithTimeout(safeImagePath)
 	if err != nil {
 		log.Printf("%s Failed to generate thumbnail for photo %d (%s): %v", shortname, task.PhotoID, safeImagePath, err)
 		return
@@ -141,6 +160,29 @@ func (q *ThumbQueue) processTask(task ThumbTask) {
 	}
 
 	log.Printf("%s Generated thumbnail for photo %d", shortname, task.PhotoID)
+}
+
+func (q *ThumbQueue) generateWithTimeout(imagePath string) (*utils.ThumbnailResult, error) {
+	if q.jobTimeout <= 0 {
+		return utils.GenerateThumbnails(imagePath)
+	}
+
+	type thumbResult struct {
+		result *utils.ThumbnailResult
+		err    error
+	}
+	done := make(chan thumbResult, 1)
+	go func() {
+		result, err := utils.GenerateThumbnails(imagePath)
+		done <- thumbResult{result: result, err: err}
+	}()
+
+	select {
+	case out := <-done:
+		return out.result, out.err
+	case <-time.After(q.jobTimeout):
+		return nil, ErrThumbnailTimeout
+	}
 }
 
 // Enqueue adds a thumbnail generation task to the queue
@@ -163,6 +205,13 @@ func (q *ThumbQueue) Enqueue(photo *models.Photo, projectName string) bool {
 	}
 
 	q.tasksMu.Lock()
+	// Reject enqueue when queue is stopped to avoid "stuck processing" states.
+	if !q.running {
+		q.tasksMu.Unlock()
+		q.processing.Delete(photo.ID)
+		return false
+	}
+
 	// Check queue length limit to prevent memory exhaustion
 	if len(q.tasks) >= maxQueueLength {
 		q.tasksMu.Unlock()
@@ -178,6 +227,13 @@ func (q *ThumbQueue) Enqueue(photo *models.Photo, projectName string) bool {
 
 	log.Printf("%s Enqueued photo %d (queue length: %d)", shortname, photo.ID, queueLen)
 	return true
+}
+
+// IsRunning reports whether the queue is accepting and processing tasks.
+func (q *ThumbQueue) IsRunning() bool {
+	q.tasksMu.Lock()
+	defer q.tasksMu.Unlock()
+	return q.running
 }
 
 // EnqueueByID adds a photo to the queue by its ID

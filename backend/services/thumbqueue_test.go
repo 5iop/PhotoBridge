@@ -15,6 +15,7 @@ func createTestQueue() *ThumbQueue {
 		tasks:   make([]ThumbTask, 0),
 		workers: 2,
 		stopCh:  make(chan struct{}),
+		running: true,
 	}
 	q.cond = sync.NewCond(&q.tasksMu)
 	return q
@@ -139,6 +140,7 @@ func TestThumbTaskFields(t *testing.T) {
 
 func TestThumbQueueStartStop(t *testing.T) {
 	q := createTestQueue()
+	q.running = false
 
 	// Start should set running to true
 	q.Start()
