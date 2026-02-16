@@ -80,8 +80,19 @@ func GenerateThumbnails(imagePath string) (*ThumbnailResult, error) {
 		largeWidth = cfg.Width
 	}
 	largeImg := imaging.Resize(working, largeWidth, 0, imaging.CatmullRom)
+	// Source image is no longer needed after the large thumbnail is created.
+	working = nil
+	img = nil
+
+	// Encode large first and release no-longer-needed references as early as possible.
+	var largeBuf bytes.Buffer
+	if err := jpeg.Encode(&largeBuf, largeImg, &jpeg.Options{Quality: JpegQualityLarge}); err != nil {
+		return nil, err
+	}
+	result.Large = largeBuf.Bytes()
 
 	smallImg := imaging.Resize(largeImg, ThumbSmallWidth, 0, imaging.Box)
+	largeImg = nil
 	smallBounds := smallImg.Bounds()
 	result.SmallWidth = smallBounds.Dx()
 	result.SmallHeight = smallBounds.Dy()
@@ -91,13 +102,6 @@ func GenerateThumbnails(imagePath string) (*ThumbnailResult, error) {
 		return nil, err
 	}
 	result.Small = smallBuf.Bytes()
-	smallImg = nil
-
-	var largeBuf bytes.Buffer
-	if err := jpeg.Encode(&largeBuf, largeImg, &jpeg.Options{Quality: JpegQualityLarge}); err != nil {
-		return nil, err
-	}
-	result.Large = largeBuf.Bytes()
 
 	return result, nil
 }
